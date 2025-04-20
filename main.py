@@ -19,10 +19,13 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Configurar CORS - Definir orígenes explícitamente para evitar errores
+cors_origins = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app"]
+
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,  # Usar la lista definida explícitamente
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
