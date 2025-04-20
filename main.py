@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import sentry_sdk
 from app.api.routes import api_router
-from app.core.config import settings
+from app.core.config import settings, CORS_ORIGINS
 
 # Configurar Sentry para monitoreo de errores
 if settings.SENTRY_DSN:
@@ -19,13 +19,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configurar CORS - Definir orígenes explícitamente para evitar errores
-cors_origins = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app"]
-
-# Configurar CORS
+# Configurar CORS usando la variable global CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,  # Usar la lista definida explícitamente
+    allow_origins=CORS_ORIGINS,  # Usar la variable global definida en config.py
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

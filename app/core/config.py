@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
 
+# Definición global de CORS_ORIGINS para evitar problemas de parsing
+CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app"]
+
 class Settings(BaseSettings):
     # Configuración general
     PROJECT_NAME: str = "GENIA MCP"
@@ -14,9 +17,6 @@ class Settings(BaseSettings):
     # Configuración de seguridad
     SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 días
-    
-    # Configuración de CORS - Definición estática para evitar problemas de parsing
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app"]
     
     # Configuración de Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
