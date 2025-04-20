@@ -1,9 +1,25 @@
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import List, Optional, Union
 import os
 from dotenv import load_dotenv
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
+
+def get_cors_origins() -> List[str]:
+    """
+    Obtiene los orígenes CORS desde la variable de entorno o usa valores predeterminados.
+    La variable de entorno debe ser una cadena separada por comas.
+    """
+    cors_env = os.getenv("CORS_ORIGINS", "")
+    if cors_env:
+        # Si hay una variable de entorno, dividir por comas
+        return [origin.strip() for origin in cors_env.split(",")]
+    # Si no hay variable de entorno, usar valores predeterminados
+    return [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://genia-frontendmpc.vercel.app",
+    ]
 
 class Settings(BaseSettings):
     # Configuración general
@@ -15,22 +31,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 días
     
-    # Configuración de CORS
-    # Permitir configurar CORS_ORIGINS desde variable de entorno o usar valores predeterminados
-    CORS_ORIGINS: List[str] = []
-    
-    @property
-    def get_cors_origins(self) -> List[str]:
-        cors_origins_env = os.getenv("CORS_ORIGINS", "")
-        if cors_origins_env:
-            # Si la variable de entorno existe, dividir por comas
-            return [origin.strip() for origin in cors_origins_env.split(",")]
-        # Si no hay variable de entorno, usar valores predeterminados
-        return [
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "https://genia-frontendmpc.vercel.app",
-        ]
+    # Configuración de CORS - Usar la función auxiliar para obtener los valores
+    CORS_ORIGINS: List[str] = get_cors_origins()
     
     # Configuración de Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
@@ -68,6 +70,3 @@ class Settings(BaseSettings):
 
 # Instancia de configuración global
 settings = Settings()
-
-# Asignar CORS_ORIGINS usando el método get_cors_origins
-settings.CORS_ORIGINS = settings.get_cors_origins
