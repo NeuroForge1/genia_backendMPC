@@ -1,0 +1,33 @@
+# Configuración para Render
+web_service:
+  name: genia-backend-mpc
+  runtime: python
+  plan: starter
+  region: oregon
+  branch: main
+  buildCommand: pip install -r requirements.txt
+  startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+  envVars:
+    - key: OPENAI_API_KEY
+      sync: false
+    - key: SUPABASE_URL
+      sync: false
+    - key: SUPABASE_KEY
+      sync: false
+    - key: TWILIO_ACCOUNT_SID
+      sync: false
+    - key: TWILIO_AUTH_TOKEN
+      sync: false
+    - key: STRIPE_SECRET_KEY
+      sync: false
+    - key: STRIPE_WEBHOOK_SECRET
+      sync: false
+    - key: GMAIL_CLIENT_ID
+      sync: false
+    - key: GMAIL_CLIENT_SECRET
+      sync: false
+    - key: JWT_SECRET
+      generateValue: true
+    - key: FRONTEND_URL
+      value: https://genia-frontend-mpc.vercel.app
+  autoDeploy: true

@@ -1,0 +1,12 @@
+{
+  "name": "genia-backend-mpc",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "uvicorn main:app --host 0.0.0.0 --port $PORT",
+    "dev": "uvicorn main:app --reload",
+    "test": "pytest"
+  }
+}
