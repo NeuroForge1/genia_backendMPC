@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Definición global de CORS_ORIGINS para evitar problemas de parsing
-CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app"]
+CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173", "https://genia-frontendmpc.vercel.app", "https://genia-frontend-mpc.vercel.app"]
 
 class Settings(BaseSettings):
     # Configuración general
