@@ -20,9 +20,11 @@ app = FastAPI(
 )
 
 # Configurar CORS usando la variable global CORS_ORIGINS
+# Asegurarse de que CORS_ORIGINS se procesa correctamente en config.py
+print(f"[DEBUG] Configurando CORS con orígenes: {CORS_ORIGINS}") # Log para verificar
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TEMPORARY TEST: Allow all origins
+    allow_origins=CORS_ORIGINS, # Revertir al uso de la configuración
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,3 +40,4 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
