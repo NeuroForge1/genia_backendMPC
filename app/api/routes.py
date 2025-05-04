@@ -14,5 +14,5 @@ api_router.include_router(genia_ceo.router, prefix="/genia", tags=["GENIA CEO"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Pagos"])
 
 # Incluir rutas de herramientas
-api_router.include_router(tools.router, prefix="/tools", tags=["Herramientas"])
+api_router.include_router(tools.router, tags=["Herramientas"])
 
