@@ -1,19 +1,22 @@
 from fastapi import APIRouter
-# Import the new tools router
-from app.api.endpoints import auth, genia_ceo, payments, tools
+# Import routers
+from app.api.endpoints import auth, genia_ceo, payments, tools, user # Import the new user router
 
 api_router = APIRouter()
 
-# Incluir rutas de autenticación
-api_router.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
+# Include authentication routes
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 
-# Incluir rutas de GENIA CEO (MCP)
+# Include GENIA CEO (MCP) routes
 api_router.include_router(genia_ceo.router, prefix="/genia", tags=["GENIA CEO"])
 
-# Incluir rutas de pagos
-api_router.include_router(payments.router, prefix="/payments", tags=["Pagos"])
+# Include payment routes
+api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])
 
-# Incluir rutas de herramientas con el prefijo correcto
-api_router.include_router(tools.router, prefix="/tools", tags=["Herramientas"])
+# Include tool routes with the correct prefix
+api_router.include_router(tools.router, prefix="/tools", tags=["Tools"])
+
+# Include user routes (including tasks)
+api_router.include_router(user.router, prefix="/user", tags=["User"]) # Add the user router
 
 
