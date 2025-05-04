@@ -22,7 +22,7 @@ app = FastAPI(
 # Configurar CORS usando la variable global CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,  # Usar la variable global definida en config.py
+    allow_origins=["*"],  # TEMPORARY TEST: Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
