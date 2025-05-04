@@ -34,8 +34,8 @@ def parse_cors_origins(origins_str: str) -> List[str]:
 
 # Read raw env var BEFORE Pydantic tries to parse it
 CORS_ALLOWED_ORIGINS_RAW = os.getenv("CORS_ALLOWED_ORIGINS", "")
-# Parse it using our function
-CORS_ORIGINS_LIST = parse_cors_origins(CORS_ALLOWED_ORIGINS_RAW)
+# Parse it using our function - Renamed to CORS_ORIGINS
+CORS_ORIGINS = parse_cors_origins(CORS_ALLOWED_ORIGINS_RAW)
 # --- End Manual CORS Parsing ---
 
 class Settings(BaseSettings):
@@ -118,6 +118,6 @@ if isinstance(settings.ALLOWED_HOSTS, str):
 else:
     ALLOWED_HOSTS_LIST = settings.ALLOWED_HOSTS # Already a list
 
-# Note: CORS_ORIGINS_LIST is now defined at the top from os.getenv
+# Note: CORS_ORIGINS is now defined at the top from os.getenv
 # The old parsing logic after settings instantiation is removed.
 
