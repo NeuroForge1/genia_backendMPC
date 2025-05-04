@@ -1,12 +1,16 @@
 import openai
+from openai import OpenAI # Import the new client
 from typing import Dict, Any
 from app.tools.base_tool import BaseTool
 from app.core.config import settings
 from app.db.supabase_manager import get_supabase_client
+import httpx # Ensure httpx is imported for audio download
+import tempfile
+import os
 
 class OpenAITool(BaseTool):
     """
-    Herramienta para interactuar con la API de OpenAI
+    Herramienta para interactuar con la API de OpenAI (v1.x.x)
     """
     def __init__(self):
         super().__init__(
@@ -14,10 +18,13 @@ class OpenAITool(BaseTool):
             description="Generación de texto y procesamiento de lenguaje natural con OpenAI"
         )
         
-        # Configurar cliente de OpenAI
-        openai.api_key = settings.OPENAI_API_KEY
+        # Configurar cliente de OpenAI (v1.x.x) - Incluir organization ID
+        self.client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            organization=settings.OPENAI_ORG_ID # Añadir ID de organización
+        )
         
-        # Registrar capacidades
+        # Registrar capacidades (schema remains the same)
         self.register_capability(
             name="generate_text",
             description="Genera texto utilizando GPT-4",
@@ -57,10 +64,11 @@ class OpenAITool(BaseTool):
     
     async def _generate_text(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Genera texto utilizando GPT-4
+        Genera texto utilizando GPT-4 (v1.x.x)
         """
         try:
-            response = await openai.ChatCompletion.create(
+            # Use the new client and method
+            response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "Eres GENIA, un asistente virtual avanzado."},
@@ -74,38 +82,50 @@ class OpenAITool(BaseTool):
                 "status": "success",
                 "text": response.choices[0].message.content
             }
+        # Catch specific exceptions if needed, e.g., openai.AuthenticationError
+        except openai.AuthenticationError as e:
+             return {"status": "error", "message": f"Error de autenticación OpenAI: {e}"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
     
     async def _transcribe_audio(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Transcribe audio utilizando Whisper
+        Transcribe audio utilizando Whisper (v1.x.x)
         """
+        temp_file_path = None
         try:
             # Descargar el audio desde la URL
-            import httpx
             async with httpx.AsyncClient() as client:
                 response = await client.get(params["audio_url"])
-                if response.status_code != 200:
-                    raise ValueError(f"Error al descargar el audio: {response.status_code}")
+                response.raise_for_status() # Raise exception for bad status codes
                 
                 # Guardar el audio temporalmente
-                import tempfile
-                import os
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                temp_file.write(response.content)
-                temp_file.close()
+                # Use context manager for safer file handling
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+                    temp_file.write(response.content)
+                    temp_file_path = temp_file.name
                 
-                # Transcribir el audio
-                with open(temp_file.name, "rb") as audio_file:
-                    transcript = await openai.Audio.transcribe("whisper-1", audio_file)
-                
-                # Eliminar el archivo temporal
-                os.unlink(temp_file.name)
+                # Transcribir el audio using the new client
+                with open(temp_file_path, "rb") as audio_file:
+                    # Use client.audio.transcriptions.create
+                    transcript = self.client.audio.transcriptions.create(
+                        model="whisper-1", 
+                        file=audio_file
+                    )
                 
                 return {
                     "status": "success",
                     "transcript": transcript.text
                 }
+        except httpx.HTTPStatusError as e:
+             return {"status": "error", "message": f"Error al descargar el audio: {e.response.status_code}"}
+        except openai.AuthenticationError as e:
+             return {"status": "error", "message": f"Error de autenticación OpenAI: {e}"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+        finally:
+            # Ensure temporary file is deleted
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+
+

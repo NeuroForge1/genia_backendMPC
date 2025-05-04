@@ -47,11 +47,15 @@ async def get_available_tools(current_user = Depends(get_current_active_user)):
     """
     Obtiene las herramientas disponibles para el usuario actual según su plan.
     """
+    print(f"[DEBUG] Endpoint /tools: Solicitud recibida para usuario ID: {current_user.get('id')}") # Log inicio
     try:
         orchestrator = get_orchestrator()
+        print("[DEBUG] Endpoint /tools: Llamando a orchestrator.get_available_tools") # Log antes de llamar
         tools = await orchestrator.get_available_tools(current_user["id"])
+        print(f"[DEBUG] Endpoint /tools: Herramientas obtenidas: {len(tools) if tools else 'None'}") # Log después de llamar
         return {"tools": tools}
     except Exception as e:
+        print(f"[ERROR] Endpoint /tools: {str(e)}") # Log de error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
