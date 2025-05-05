@@ -1,75 +1,76 @@
 # /home/ubuntu/genia_backendMPC/app/nlp/command_interpreter.py
-
 import json
-from typing import Dict, Any
-# Importar la clase MCPClient, no la instancia global
+import logging
 from app.mcp_client.client import MCPClient, SimpleMessage, SimpleTextContent
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class CommandInterpreter:
-    """Interpreta el texto del usuario para determinar el comando y los parámetros."""
-
     def __init__(self, mcp_client: MCPClient):
-        """Inicializa el intérprete con una instancia del cliente MCP."""
         self.mcp_client = mcp_client
-        print("CommandInterpreter inicializado con cliente MCP.")
 
-    async def interpret_command(self, user_text: str) -> Dict[str, Any]:
-        """Usa OpenAI (vía MCP) para interpretar el comando del usuario."""
-        print(f"CommandInterpreter: Interpretando texto: 	'{user_text}'")
+    async def interpret_command(self, text: str) -> dict:
+        """Interpreta el texto del usuario para identificar un comando y sus parámetros usando el MCP de OpenAI."""
+        logger.info(f"CommandInterpreter: Interpretando texto: 	'{text[:50]}...'" )
 
-        # TODO: Mejorar el prompt para extraer comando y parámetros de forma estructurada (JSON)
+        # Prompt corregido: Se elimina 'transcribe_audio' de los comandos que el usuario puede solicitar directamente.
+        # La transcripción es un paso previo, el texto resultante es el que se interpreta aquí.
         prompt = f"""
 Dada la siguiente solicitud del usuario, identifica el comando principal y cualquier parámetro relevante. Responde SOLO con un objeto JSON con las claves 'command' (string) y 'parameters' (objeto con parámetros específicos del comando).
 
-Comandos posibles y sus parámetros:
+Comandos posibles que el usuario puede solicitar y sus parámetros:
 - generate_text: {{"topic": "string"}}
 - search_keywords: {{"topic": "string"}}
 - send_whatsapp: {{"recipient_number": "string", "message_text": "string"}}
-- transcribe_audio: (sin parámetros explícitos, se asume que el audio ya está disponible)
-- unknown: (si no se reconoce ningún comando)
+- unknown: (si no se reconoce ningún comando de los anteriores)
 
-Solicitud del usuario: "{user_text}"
+Solicitud del usuario: "{text}"
 
 JSON de respuesta:
 """
-
+        # Prepare request for MCP OpenAI (assuming default capability is text generation/interpretation)
         request_message = SimpleMessage(
             role="user",
             content=SimpleTextContent(text=prompt),
-            metadata={"model": "gpt-3.5-turbo"} # O el modelo que prefieras
+            metadata={"model": "gpt-3.5-turbo"} # Specify model if needed by MCP
         )
 
         interpreted_command = {"command": "unknown", "parameters": {}}
-
         try:
-            # Usar la instancia del cliente MCP guardada en self.mcp_client
             async for response in self.mcp_client.request_mcp_server("openai", request_message):
                 if response.role == "assistant" and response.content.text:
                     try:
-                        # Intenta parsear la respuesta JSON de OpenAI
+                        # Parse the JSON response from OpenAI
                         command_data = json.loads(response.content.text.strip())
-                        if isinstance(command_data, dict) and 'command' in command_data:
-                            interpreted_command = command_data
-                            print(f"CommandInterpreter: Comando interpretado: {interpreted_command}")
-                        else:
-                            print(f"CommandInterpreter: Respuesta de OpenAI no es un JSON válido de comando: {response.content.text}")
-                        break # Asumimos que OpenAI da la respuesta completa en un mensaje
-                    except json.JSONDecodeError:
-                        print(f"CommandInterpreter: Error al decodificar JSON de OpenAI: {response.content.text}")
-                        # Mantener comando como 'unknown'
+                        # Basic validation
+                        if "command" in command_data and isinstance(command_data["command"], str):
+                             interpreted_command["command"] = command_data["command"]
+                        if "parameters" in command_data and isinstance(command_data["parameters"], dict):
+                             interpreted_command["parameters"] = command_data["parameters"]
+                        logger.info(f"CommandInterpreter: Comando interpretado: {interpreted_command}")
+                        break # Got the interpretation
+                    except json.JSONDecodeError as json_err:
+                        logger.error(f"CommandInterpreter: Error al parsear JSON de OpenAI: {json_err} - Respuesta: {response.content.text}")
+                        interpreted_command["error"] = f"Invalid JSON response from interpreter: {response.content.text}"
                         break
                 elif response.role == "error":
-                    print(f"CommandInterpreter: Error recibido del servidor MCP OpenAI: {response.content.text}")
+                    error_message = response.content.text
+                    logger.error(f"CommandInterpreter: Error recibido del servidor MCP OpenAI: {error_message}")
+                    interpreted_command["error"] = f"Interpreter service error: {error_message}"
                     break
+            else: # If loop finishes without break (no assistant/error message)
+                 logger.warning("CommandInterpreter: No se recibió respuesta válida del servidor MCP OpenAI.")
+                 interpreted_command["error"] = "No response from interpreter service."
 
-        except ConnectionError as e:
-            print(f"CommandInterpreter: Error de conexión al servidor MCP OpenAI: {e}")
+        except ConnectionError as conn_err:
+            logger.error(f"CommandInterpreter: Error de conexión al servidor MCP OpenAI: {conn_err}")
+            interpreted_command["error"] = f"Connection error to interpreter service: {conn_err}"
         except Exception as e:
-            print(f"CommandInterpreter: Error inesperado al interpretar comando: {e}")
+            logger.exception(f"CommandInterpreter: Error inesperado durante la interpretación: {e}")
+            interpreted_command["error"] = f"Unexpected error during interpretation: {e}"
 
-        # Asegurarse de que siempre haya una clave 'parameters' aunque sea vacía
-        if "parameters" not in interpreted_command:
-             interpreted_command["parameters"] = {}
-
+        # Return the dictionary (including potential error key)
         return interpreted_command
 
