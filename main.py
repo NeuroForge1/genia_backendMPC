@@ -1,9 +1,10 @@
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# Se cambia la importación a Starlette
+from starlette.middleware.cors import CORSMiddleware
 import sentry_sdk
 from app.api.routes import api_router
-from app.core.config import settings # CORS_ORIGINS ya no se usa directamente aquí
+from app.core.config import settings
 
 # Configurar Sentry para monitoreo de errores
 if settings.SENTRY_DSN:
@@ -19,18 +20,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# --- Configuración CORS Simplificada (Prueba) ---
-# Se ignora la variable de entorno y se usa una lista fija
+# --- Configuración CORS con Starlette Middleware (Prueba) ---
+# Se usa una lista fija y el middleware de Starlette
 FIXED_ALLOWED_ORIGINS = ["https://genia-frontend-mpc.vercel.app", "http://localhost:5173"]
-print(f"[DEBUG] Configurando CORS con orígenes FIJOS: {FIXED_ALLOWED_ORIGINS}") # Log para verificar
+print(f"[DEBUG] Configurando CORS con Starlette Middleware y orígenes FIJOS: {FIXED_ALLOWED_ORIGINS}") # Log para verificar
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware, # Ahora es de Starlette
     allow_origins=FIXED_ALLOWED_ORIGINS, # Usar lista fija
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- Fin Configuración CORS Simplificada ---
+# --- Fin Configuración CORS con Starlette ---
 
 # Incluir rutas de la API
 app.include_router(api_router, prefix=settings.API_V1_STR)
