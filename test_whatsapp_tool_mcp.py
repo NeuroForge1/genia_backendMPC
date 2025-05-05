@@ -21,8 +21,8 @@ async def run_whatsapp_test():
 
     whatsapp_tool = WhatsAppTool() # Assumes config is loaded via .env
     test_user_id = str(uuid.uuid4()) # Use a pure UUID
-    target_number = "+16575272405" # Número proporcionado por el usuario
-    message_body = "Hola desde GENIA via MCP! Esta es una prueba de integración."
+    target_number = "+16575143018" # Número proporcionado por el usuario
+    message_body = "TE AMO mi amor ana de mi vida"
 
     # --- Test send_message via MCP ---
     print(f"\n--- Probando WhatsAppTool (send_message) a {target_number} ---")
