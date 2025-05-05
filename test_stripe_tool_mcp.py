@@ -20,7 +20,10 @@ async def run_stripe_tests():
     print("Asegúrate de que el servidor MCP de Stripe esté corriendo en localhost:8002")
 
     stripe_tool = StripeTool() # Assumes config is loaded via .env
-    test_user_id = f"test_user_{uuid.uuid4()}" # Unique user ID for testing
+    
+    # Usar un UUID puro como ID de usuario para pruebas, sin prefijo
+    # Esto soluciona el error "invalid input syntax for type uuid"
+    test_user_id = str(uuid.uuid4())  # Cambiado: ahora es un UUID puro
     test_email = f"test+{uuid.uuid4()}@example.com" # Unique email for testing
     customer_id = None
 
@@ -96,4 +99,3 @@ async def run_stripe_tests():
 
 if __name__ == "__main__":
     asyncio.run(run_stripe_tests())
-

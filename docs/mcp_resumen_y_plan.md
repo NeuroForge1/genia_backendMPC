@@ -195,3 +195,74 @@ Se realizaron pruebas para validar la integración de Stripe vía MCP.
 *   **Integración Frontend:** Conectar frontend si es necesario.
 *   **Resolver Problemas Funcionales:** Abordar problemas pendientes como la carga infinita del dashboard.
 
+
+
+
+## 15. Implementación del Servidor MCP para Twilio
+
+Continuando con la arquitectura MCP, se implementó el servidor para Twilio.
+
+*   **Análisis:** Se identificó que Twilio se usa principalmente en `whatsapp_tool.py` para enviar mensajes (`send_message`).
+*   **Diseño:**
+    *   Microservicio FastAPI separado (`genia-mcp-server-twilio`).
+    *   Endpoint `/mcp` aceptando `SimpleMessage`.
+    *   Capacidad principal: `send_whatsapp_message`.
+    *   Parámetros (`metadata`): `to` (número destino), `body` (mensaje).
+    *   Lógica: Usar credenciales Twilio (`.env`) para enviar mensaje vía API.
+    *   Respuesta SSE: `SimpleMessage` con `message_sid` o error.
+*   **Implementación:**
+    *   Estructura creada en `/home/ubuntu/genia_mcp_server_twilio`.
+    *   Dependencias en `requirements.txt`.
+    *   `.env.example` y `.env` creados (con credenciales proporcionadas).
+    *   `main.py` implementado con FastAPI, endpoint `/mcp`, lógica para `send_whatsapp_message`.
+*   **Repositorio:** Creado en `NeuroForge1/genia-mcp-server-twilio` usando la API de GitHub.
+*   **Código Subido:** El código del servidor se subió exitosamente al repositorio.
+
+## 16. Integración del Cliente MCP para Twilio en Backend
+
+Se modificó el backend para usar el nuevo servidor MCP de Twilio.
+
+*   **Cliente MCP Actualizado:** Se añadió la URL del servidor Twilio (`http://localhost:8003/mcp`) a `SERVER_URLS` en `app/mcp_client/client.py`.
+*   **`whatsapp_tool.py` Modificado:**
+    *   Se eliminó la importación y uso directo de `twilio.rest.Client` para `send_message`.
+    *   Se importó `mcp_client_instance`.
+    *   Se creó un método helper `_call_mcp_twilio`.
+    *   Se modificó `execute` y se creó `_send_message_mcp` para usar el cliente MCP.
+    *   Se comentó la capacidad `send_template` ya que no está implementada en el servidor MCP.
+
+## 17. Pruebas de Integración (Twilio)
+
+Se realizaron pruebas para validar la integración de Twilio vía MCP.
+
+*   **Servidor Iniciado:** Se ejecutó el servidor MCP de Twilio (`python3 main.py` en `/home/ubuntu/genia_mcp_server_twilio`).
+*   **Script de Prueba:** Se creó y ejecutó `/home/ubuntu/genia_backendMPC/test_whatsapp_tool_mcp.py` para enviar un mensaje a `+16575272405`.
+*   **Resultados:**
+    *   La prueba **falló** al intentar enviar el mensaje.
+    *   El error devuelto por el servidor MCP (originado en Twilio) fue: `"Error de Twilio: Unable to create record: AccountSid [SID inválido proporcionado] is invalid"` (Código Twilio: 21470, Status: 400).
+*   **Conclusión:** La **arquitectura MCP funcionó correctamente**: la solicitud pasó del backend al cliente MCP, al servidor MCP de Twilio, y este intentó contactar a Twilio. El error indica un **problema con las credenciales de Twilio proporcionadas (Account SID inválido)**, no un fallo en la integración MCP en sí.
+
+## 18. Estado Actual y Próximos Pasos (Post-Twilio)
+
+**Estado Actual:**
+
+*   Servidor MCP para OpenAI implementado, integrado y probado.
+*   Servidor MCP para Stripe implementado, integrado y probado.
+*   Servidor MCP para Twilio implementado, integrado y probado (con error de credenciales Twilio).
+*   Cliente MCP en backend actualizado para soportar los tres servidores.
+*   Código de integración de OpenAI y Stripe (backend) subido a GitHub.
+*   Código de los servidores MCP de OpenAI, Stripe y Twilio subidos a sus respectivos repositorios.
+*   Código de integración de Twilio (backend) **pendiente de subir a GitHub**.
+
+**Próximos Pasos Inmediatos:**
+
+1.  **Subir Cambios Twilio Backend:** Añadir cambios en `genia_backendMPC` (cliente, whatsapp_tool, test script), hacer commit y push.
+2.  **Reportar Resultados:** Informar al usuario sobre la finalización de la integración de Twilio, incluyendo el error de credenciales.
+3.  **Decidir Siguiente Tarea:** Consultar al usuario sobre los próximos pasos (ej. implementar otro servidor MCP, abordar problemas funcionales como carga del dashboard, revisar credenciales Twilio, etc.).
+
+**Pasos Futuros:**
+
+*   **Resolver Error Supabase (Stripe):** Investigar por qué falla la actualización del usuario aunque la columna exista (posiblemente el usuario de prueba no existe).
+*   **Manejo de Claves de Usuario:** Implementar la lógica para permitir a los usuarios usar sus propias claves API a través de MCP.
+*   **Refinar Protocolo:** Reevaluar librerías MCP estándar.
+*   **Integración Frontend:** Conectar frontend si es necesario.
+*   **Resolver Problemas Funcionales:** Abordar problemas pendientes como la carga infinita del dashboard.

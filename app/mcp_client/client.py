@@ -21,7 +21,7 @@ class SimpleMessage(BaseModel):
 SERVER_URLS = {
     "openai": "http://localhost:8001/mcp", # URL del servidor MCP simplificado para OpenAI
     "stripe": "http://localhost:8002/mcp", # URL del servidor MCP simplificado para Stripe
-    # Añadir URLs para otros servidores MCP (Twilio, etc.)
+    "twilio": "http://localhost:8003/mcp"  # URL del servidor MCP simplificado para Twilio
 }
 
 # --- Cliente MCP Simplificado ---
@@ -134,4 +134,3 @@ if __name__ == "__main__":
     import asyncio
     print("Ejecutando prueba interna del cliente MCP...")
     asyncio.run(_test_client())
-
