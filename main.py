@@ -1,8 +1,8 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# Eliminar importación innecesaria de JSONResponse
-# from fastapi.responses import JSONResponse 
+# Re-añadir importación de JSONResponse para el handler OPTIONS
+from fastapi.responses import JSONResponse 
 import sentry_sdk
 from app.api.routes import api_router
 # Importar settings y la variable CORS_ORIGINS parseada
@@ -37,14 +37,23 @@ else:
     print("[WARN] CORS_ORIGINS no está configurado o parseado correctamente. CORS no habilitado.")
 # --- Fin Configuración CORS Corregida ---
 
-# --- ELIMINADO Manejador Explícito OPTIONS ---
-# @app.options("/{rest_of_path:path}")
-# async def preflight_handler(rest_of_path: str):
-#     print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
-#     return JSONResponse(content={"message": "Preflight check successful"})
-# --- Fin ELIMINADO Manejador Explícito OPTIONS ---
+# --- RE-AÑADIDO Manejador Explícito OPTIONS ---
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
+    # Devolver cabeceras CORS necesarias para la solicitud preflight
+    return JSONResponse(
+        content={"message": "Preflight check successful"},
+        headers={
+            "Access-Control-Allow-Origin": ",".join(CORS_ORIGINS) if CORS_ORIGINS else "*", # Devolver los orígenes permitidos
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*", # Permitir todas las cabeceras solicitadas
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+# --- Fin RE-AÑADIDO Manejador Explícito OPTIONS ---
 
-# Incluir rutas de la API (después de CORS)
+# Incluir rutas de la API (después de CORS y OPTIONS handler)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Ruta de verificación de salud
@@ -54,5 +63,4 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
 
