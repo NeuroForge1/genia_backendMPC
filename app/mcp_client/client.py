@@ -25,7 +25,7 @@ SERVER_URLS = {
 }
 
 # --- Cliente MCP Simplificado ---
-class GeniaMCPClient:
+class MCPClient:
     def __init__(self, timeout: float = 30.0): # Increased timeout slightly
         self._timeout = httpx.Timeout(timeout, connect=timeout*2) # Timeout para conexión y lectura
         self._http_client = httpx.AsyncClient(timeout=self._timeout)
@@ -110,7 +110,7 @@ class GeniaMCPClient:
              print("Cliente MCP Simplificado ya estaba cerrado.")
 
 # Instancia global (o gestionada por dependencias FastAPI)
-mcp_client_instance = GeniaMCPClient()
+mcp_client_instance = MCPClient()
 
 # --- Ejemplo de uso (para pruebas internas si es necesario) ---
 async def _test_client():
