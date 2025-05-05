@@ -1,9 +1,12 @@
 import uvicorn
 from fastapi import FastAPI
-# Se cambia la importación a Starlette
-from starlette.middleware.cors import CORSMiddleware
+# Revertir a la importación original de FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+# Importar JSONResponse para el handler OPTIONS
+from fastapi.responses import JSONResponse
 import sentry_sdk
 from app.api.routes import api_router
+# Asegurarse de que settings se importa para leer CORS_ORIGINS
 from app.core.config import settings
 
 # Configurar Sentry para monitoreo de errores
@@ -20,20 +23,31 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# --- Configuración CORS con Starlette Middleware (Prueba) ---
-# Se usa una lista fija y el middleware de Starlette
-FIXED_ALLOWED_ORIGINS = ["https://genia-frontend-mpc.vercel.app", "http://localhost:5173"]
-print(f"[DEBUG] Configurando CORS con Starlette Middleware y orígenes FIJOS: {FIXED_ALLOWED_ORIGINS}") # Log para verificar
-app.add_middleware(
-    CORSMiddleware, # Ahora es de Starlette
-    allow_origins=FIXED_ALLOWED_ORIGINS, # Usar lista fija
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-# --- Fin Configuración CORS con Starlette ---
+# --- Configuración CORS Original (Usando Variable de Entorno) ---
+if settings.CORS_ORIGINS:
+    print(f"[DEBUG] Configurando CORS con orígenes desde Env Var: {settings.CORS_ORIGINS}") # Log para verificar
+    app.add_middleware(
+        CORSMiddleware, # Middleware de FastAPI
+        allow_origins=[str(origin).strip() for origin in settings.CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    print("[WARN] CORS_ORIGINS no está configurado. CORS no habilitado.")
+# --- Fin Configuración CORS Original ---
 
-# Incluir rutas de la API
+# --- Manejador Explícito OPTIONS (Paso 3 Prueba) ---
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
+    # Devolver una respuesta simple con cabeceras CORS permisivas
+    # Nota: El middleware CORS debería añadir las cabeceras correctas si está configurado
+    # Esta ruta es más un 'catch-all' para asegurar que OPTIONS no falle con 404 o 405
+    return JSONResponse(content={"message": "Preflight check successful"})
+# --- Fin Manejador Explícito OPTIONS ---
+
+# Incluir rutas de la API (después de CORS y OPTIONS handler)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Ruta de verificación de salud
