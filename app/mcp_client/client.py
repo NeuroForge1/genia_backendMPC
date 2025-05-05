@@ -25,33 +25,40 @@ SERVER_URLS = {
 
 # --- Cliente MCP Simplificado ---
 class GeniaMCPClient:
-    def __init__(self, timeout: float = 10.0):
+    def __init__(self, timeout: float = 30.0): # Increased timeout slightly
         self._timeout = httpx.Timeout(timeout, connect=timeout*2) # Timeout para conexión y lectura
         self._http_client = httpx.AsyncClient(timeout=self._timeout)
 
     async def request_mcp_server(self, server_name: str, request_message: SimpleMessage) -> AsyncGenerator[SimpleMessage, None]:
         """Envía una solicitud a un servidor MCP simplificado vía POST y devuelve un generador asíncrono de mensajes SSE."""
         if server_name not in SERVER_URLS:
-            raise ValueError(f"URL para el servidor MCP 	'{server_name}	' no configurada.")
+            raise ValueError(f"URL para el servidor MCP 	'{server_name}'	 no configurada.")
 
         server_url = SERVER_URLS[server_name]
-        request_data = request_message.model_dump_json()
+        # Use model_dump instead of model_dump_json for httpx content
+        request_data = request_message.model_dump(mode='json') 
 
-        print(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {request_data}")
+        print(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {json.dumps(request_data)}")
 
         try:
-            async with self._http_client.stream("POST", server_url, content=request_data, headers={'Content-Type': 'application/json', 'Accept': 'text/event-stream'}) as response:
+            async with self._http_client.stream("POST", server_url, json=request_data, headers={'Accept': 'text/event-stream'}) as response:
                 
                 # Verificar si la conexión SSE fue exitosa
                 if response.status_code != 200:
                      error_content = await response.aread()
                      print(f"Error al conectar con el servidor SSE {server_name}: {response.status_code} - {error_content.decode()}")
-                     raise ConnectionError(f"Error {response.status_code} al conectar con {server_name}")
+                     raise ConnectionError(f"Error {response.status_code} al conectar con {server_name}: {error_content.decode()}")
 
                 print(f"Cliente Simplificado: Conexión SSE establecida con {server_name}.")
                 
+                current_event = None # Initialize current_event
                 # Procesar el stream SSE
                 async for line in response.aiter_lines():
+                    line = line.strip()
+                    if not line:
+                        current_event = None # Reset event on empty line
+                        continue
+                        
                     if line.startswith("event:"):
                         current_event = line.split(":", 1)[1].strip()
                     elif line.startswith("data:"):
@@ -59,6 +66,7 @@ class GeniaMCPClient:
                         if current_event == "message" or current_event == "error":
                             try:
                                 message_data = json.loads(data_str)
+                                # Validate with Pydantic model before yielding
                                 response_msg = SimpleMessage(**message_data)
                                 print(f"Cliente Simplificado: Recibido {current_event} de {server_name}: {response_msg.model_dump_json()}")
                                 yield response_msg
@@ -66,11 +74,11 @@ class GeniaMCPClient:
                                 print(f"Cliente Simplificado: Error al parsear mensaje {current_event} de {server_name}: {parse_error} - Data: {data_str}")
                         elif current_event == "end":
                              print(f"Cliente Simplificado: Recibido evento 'end' de {server_name}.")
-                             # Podríamos romper el bucle aquí si 'end' siempre es el último evento
-                             # break 
-                        current_event = None # Reset event after processing data
-                    elif not line.strip(): # Línea vacía separa eventos
-                        current_event = None
+                             # End event might contain data or just signal completion
+                             # break # Don't break here, process potential data first
+                        # Reset event only after processing data or on empty line
+                        # current_event = None 
+                    # else: ignore other lines for now
 
         except httpx.RequestError as req_err:
             print(f"Cliente Simplificado: Error de red al conectar con {server_name}: {req_err}")
@@ -83,8 +91,11 @@ class GeniaMCPClient:
 
     async def close(self):
         """Cierra el cliente HTTPX."""
-        await self._http_client.aclose()
-        print("Cliente MCP Simplificado cerrado.")
+        if not self._http_client.is_closed:
+             await self._http_client.aclose()
+             print("Cliente MCP Simplificado cerrado.")
+        else:
+             print("Cliente MCP Simplificado ya estaba cerrado.")
 
 # Instancia global (o gestionada por dependencias FastAPI)
 mcp_client_instance = GeniaMCPClient()
@@ -97,14 +108,18 @@ async def _test_client():
         content=SimpleTextContent(text="Explica qué es el Protocolo MCP en 3 frases."),
         metadata={"model": "gpt-3.5-turbo"}
     )
+    temp_client = GeniaMCPClient() # Use a temporary client for the test
     try:
-        async for response in mcp_client_instance.request_mcp_server("openai", test_message):
+        async for response in temp_client.request_mcp_server("openai", test_message):
             print(f"---> Respuesta recibida en test: {response.content.text}")
     except Exception as e:
         print(f"Error en la prueba del cliente: {e}")
     finally:
-        await mcp_client_instance.close()
+        await temp_client.close() # Close the temporary client
 
-import asyncio
-asyncio.run(_test_client())
+# Only run the test if the script is executed directly
+if __name__ == "__main__":
+    import asyncio
+    print("Ejecutando prueba interna del cliente MCP...")
+    asyncio.run(_test_client())
 

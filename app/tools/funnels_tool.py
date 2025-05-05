@@ -2,7 +2,10 @@ from typing import Dict, Any, List
 from app.tools.base_tool import BaseTool
 from app.core.config import settings
 from app.db.supabase_manager import get_supabase_client
-import openai
+# import openai # Removed direct OpenAI import
+
+# Import the simplified MCP client instance and message structure
+from app.mcp_client.client import mcp_client_instance, SimpleMessage, SimpleTextContent
 
 class FunnelsTool(BaseTool):
     """
@@ -14,13 +17,13 @@ class FunnelsTool(BaseTool):
             description="Creación y gestión de embudos de ventas"
         )
         
-        # Configurar cliente de OpenAI
-        openai.api_key = settings.OPENAI_API_KEY
+        # Removed direct OpenAI client configuration
+        # openai.api_key = settings.OPENAI_API_KEY
         
-        # Registrar capacidades
+        # Registrar capacidades (schemas remain the same)
         self.register_capability(
             name="create_sales_funnel",
-            description="Crea un embudo de ventas completo",
+            description="Crea un embudo de ventas completo (vía MCP)",
             schema={
                 "type": "object",
                 "properties": {
@@ -37,7 +40,7 @@ class FunnelsTool(BaseTool):
         
         self.register_capability(
             name="generate_landing_page",
-            description="Genera contenido para una landing page",
+            description="Genera contenido para una landing page (vía MCP)",
             schema={
                 "type": "object",
                 "properties": {
@@ -54,7 +57,7 @@ class FunnelsTool(BaseTool):
         
         self.register_capability(
             name="create_email_sequence",
-            description="Crea una secuencia de emails para un embudo de ventas",
+            description="Crea una secuencia de emails para un embudo de ventas (vía MCP)",
             schema={
                 "type": "object",
                 "properties": {
@@ -72,17 +75,43 @@ class FunnelsTool(BaseTool):
         Ejecuta una capacidad de la herramienta Funnels
         """
         if capability == "create_sales_funnel":
-            return await self._create_sales_funnel(params)
+            return await self._create_sales_funnel_mcp(params)
         elif capability == "generate_landing_page":
-            return await self._generate_landing_page(params)
+            return await self._generate_landing_page_mcp(params)
         elif capability == "create_email_sequence":
-            return await self._create_email_sequence(params)
+            return await self._create_email_sequence_mcp(params)
         else:
             raise ValueError(f"Capacidad no soportada: {capability}")
-    
-    async def _create_sales_funnel(self, params: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _call_mcp_openai(self, prompt: str, system_message: str = "Eres un asistente útil.", model: str = "gpt-4", max_tokens: int = 2000, temperature: float = 0.7) -> str:
+        """Helper function to call OpenAI via MCP client."""
+        mcp_message = SimpleMessage(
+            role="user",
+            content=SimpleTextContent(text=prompt),
+            metadata={
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "system_message": system_message # Pass system message via metadata if server supports it
+            }
+        )
+        
+        response_text = None
+        async for response_msg in mcp_client_instance.request_mcp_server("openai", mcp_message):
+            if response_msg.role == "assistant" and isinstance(response_msg.content, SimpleTextContent):
+                response_text = response_msg.content.text
+                break # Stop after getting the first valid message
+            elif response_msg.role == "error":
+                raise ConnectionError(f"Error recibido del servidor MCP: {response_msg.content.text}")
+        
+        if response_text is None:
+            raise ConnectionError("No se recibió una respuesta válida del servidor MCP de OpenAI.")
+            
+        return response_text
+
+    async def _create_sales_funnel_mcp(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Crea un embudo de ventas completo
+        Crea un embudo de ventas completo usando MCP
         """
         try:
             product_name = params["product_name"]
@@ -99,7 +128,7 @@ class FunnelsTool(BaseTool):
             Audiencia objetivo: {target_audience}
             Punto de precio: ${price_point}
             Número de etapas: {funnel_stages}
-            {'Incluir upsells/cross-sells' if include_upsells else 'Sin upsells/cross-sells'}
+            {	'Incluir upsells/cross-sells' if include_upsells else 'Sin upsells/cross-sells'}
             
             Para cada etapa del embudo, proporciona:
             1. Nombre de la etapa
@@ -117,20 +146,14 @@ class FunnelsTool(BaseTool):
             Formatea la respuesta de manera estructurada y clara.
             """
             
-            # Generar el embudo con OpenAI
-            response = await openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en marketing digital y embudos de ventas con años de experiencia en optimización de conversión."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=2500,
-                temperature=0.7
+            # Generar el embudo con OpenAI via MCP
+            funnel_content = await self._call_mcp_openai(
+                prompt=prompt,
+                system_message="Eres un experto en marketing digital y embudos de ventas con años de experiencia en optimización de conversión.",
+                max_tokens=2500
             )
             
-            funnel_content = response.choices[0].message.content.strip()
-            
-            # Generar un diagrama de flujo del embudo (descripción textual)
+            # Generar un diagrama de flujo del embudo (descripción textual) via MCP
             flow_prompt = f"""
             Crea una descripción detallada de un diagrama de flujo para un embudo de ventas de {funnel_stages} etapas para el producto {product_name} dirigido a {target_audience}.
             
@@ -138,22 +161,16 @@ class FunnelsTool(BaseTool):
             - El flujo de usuarios a través de cada etapa
             - Puntos de decisión clave
             - Rutas alternativas
-            {'- Oportunidades de upsell/cross-sell' if include_upsells else ''}
+            {	'- Oportunidades de upsell/cross-sell' if include_upsells else ''}
             
             Describe el diagrama de manera que pueda ser implementado fácilmente por un diseñador.
             """
             
-            flow_response = await openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en diagramas de flujo y visualización de procesos de marketing."},
-                    {"role": "user", "content": flow_prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.7
+            flow_description = await self._call_mcp_openai(
+                prompt=flow_prompt,
+                system_message="Eres un experto en diagramas de flujo y visualización de procesos de marketing.",
+                max_tokens=1000
             )
-            
-            flow_description = flow_response.choices[0].message.content.strip()
             
             return {
                 "status": "success",
@@ -165,9 +182,9 @@ class FunnelsTool(BaseTool):
         except Exception as e:
             return {"status": "error", "message": str(e)}
     
-    async def _generate_landing_page(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _generate_landing_page_mcp(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Genera contenido para una landing page
+        Genera contenido para una landing page usando MCP
         """
         try:
             product_name = params["product_name"]
@@ -193,7 +210,7 @@ class FunnelsTool(BaseTool):
             4. 3-5 características principales con sus beneficios
             5. Sección "Cómo funciona" o proceso
             6. Propuesta de valor única
-            7. {'Sección de testimonios (genera 3 testimonios ficticios pero realistas)' if include_testimonials else ''}
+            7. {	'Sección de testimonios (genera 3 testimonios ficticios pero realistas)' if include_testimonials else ''}
             8. Sección de preguntas frecuentes (5 preguntas con respuestas)
             9. Llamada a la acción principal
             10. Garantía o reducción de riesgo
@@ -201,20 +218,14 @@ class FunnelsTool(BaseTool):
             Formatea el contenido en HTML básico (h1, h2, p, ul, etc.) para facilitar su implementación.
             """
             
-            # Generar el contenido con OpenAI
-            response = await openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un copywriter experto en landing pages de alta conversión."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=2500,
-                temperature=0.7
+            # Generar el contenido con OpenAI via MCP
+            landing_content = await self._call_mcp_openai(
+                prompt=prompt,
+                system_message="Eres un copywriter experto en landing pages de alta conversión.",
+                max_tokens=2500
             )
             
-            landing_content = response.choices[0].message.content.strip()
-            
-            # Generar sugerencias de diseño
+            # Generar sugerencias de diseño via MCP
             design_prompt = f"""
             Proporciona 5 recomendaciones específicas de diseño para una landing page de {product_name} dirigida a {target_audience} con el beneficio principal de "{main_benefit}".
             
@@ -226,17 +237,11 @@ class FunnelsTool(BaseTool):
             - Optimización móvil
             """
             
-            design_response = await openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un diseñador web especializado en landing pages de conversión."},
-                    {"role": "user", "content": design_prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.7
+            design_recommendations = await self._call_mcp_openai(
+                prompt=design_prompt,
+                system_message="Eres un diseñador web especializado en landing pages de conversión.",
+                max_tokens=1000
             )
-            
-            design_recommendations = design_response.choices[0].message.content.strip()
             
             return {
                 "status": "success",
@@ -248,9 +253,9 @@ class FunnelsTool(BaseTool):
         except Exception as e:
             return {"status": "error", "message": str(e)}
     
-    async def _create_email_sequence(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _create_email_sequence_mcp(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Crea una secuencia de emails para un embudo de ventas
+        Crea una secuencia de emails para un embudo de ventas usando MCP
         """
         try:
             product_name = params["product_name"]
@@ -283,24 +288,19 @@ class FunnelsTool(BaseTool):
             Formatea la respuesta de manera estructurada y clara, separando cada email.
             """
             
-            # Generar la secuencia con OpenAI
-            response = await openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en email marketing con años de experiencia en secuencias automatizadas."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=3000,
-                temperature=0.7
+            # Generar la secuencia con OpenAI via MCP
+            sequence_content = await self._call_mcp_openai(
+                prompt=prompt,
+                system_message="Eres un experto en email marketing con años de experiencia en secuencias automatizadas.",
+                max_tokens=3000
             )
-            
-            sequence_content = response.choices[0].message.content.strip()
             
             # Extraer los asuntos de los emails si se solicitaron
             subjects = []
             if include_subject_lines:
                 import re
-                subjects = re.findall(r'Asunto[:\s]+(.*?)(?:\n|$)', sequence_content)
+                # Attempt to find subjects assuming a pattern like "Asunto: ..." or "Subject: ..."
+                subjects = re.findall(r'(?:Asunto|Subject)[:\s]+(.*?)(?:\n|$)', sequence_content, re.IGNORECASE)
             
             return {
                 "status": "success",
@@ -312,3 +312,4 @@ class FunnelsTool(BaseTool):
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
