@@ -42,10 +42,12 @@ else:
 async def preflight_handler(rest_of_path: str):
     print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
     # Devolver cabeceras CORS necesarias para la solicitud preflight
+    # Asegurarse de que CORS_ORIGINS se use correctamente aquí también
+    origin_header = ",".join(CORS_ORIGINS) if CORS_ORIGINS else "*"
     return JSONResponse(
         content={"message": "Preflight check successful"},
         headers={
-            "Access-Control-Allow-Origin": ",".join(CORS_ORIGINS) if CORS_ORIGINS else "*", # Devolver los orígenes permitidos
+            "Access-Control-Allow-Origin": origin_header, # Usar la variable global parseada
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": "*", # Permitir todas las cabeceras solicitadas
             "Access-Control-Allow-Credentials": "true",
