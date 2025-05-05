@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import sentry_sdk
 from app.api.routes import api_router
-from app.core.config import settings, CORS_ORIGINS
+from app.core.config import settings # CORS_ORIGINS ya no se usa directamente aquí
 
 # Configurar Sentry para monitoreo de errores
 if settings.SENTRY_DSN:
@@ -19,16 +19,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configurar CORS usando la variable global CORS_ORIGINS
-# Asegurarse de que CORS_ORIGINS se procesa correctamente en config.py
-print(f"[DEBUG] Configurando CORS con orígenes: {CORS_ORIGINS}") # Log para verificar
+# --- Configuración CORS Simplificada (Prueba) ---
+# Se ignora la variable de entorno y se usa una lista fija
+FIXED_ALLOWED_ORIGINS = ["https://genia-frontend-mpc.vercel.app", "http://localhost:5173"]
+print(f"[DEBUG] Configurando CORS con orígenes FIJOS: {FIXED_ALLOWED_ORIGINS}") # Log para verificar
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS, # Revertir al uso de la configuración
+    allow_origins=FIXED_ALLOWED_ORIGINS, # Usar lista fija
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- Fin Configuración CORS Simplificada ---
 
 # Incluir rutas de la API
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -40,4 +42,5 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
 
