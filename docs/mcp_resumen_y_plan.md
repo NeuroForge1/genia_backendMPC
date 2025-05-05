@@ -266,3 +266,94 @@ Se realizaron pruebas para validar la integración de Twilio vía MCP.
 *   **Refinar Protocolo:** Reevaluar librerías MCP estándar.
 *   **Integración Frontend:** Conectar frontend si es necesario.
 *   **Resolver Problemas Funcionales:** Abordar problemas pendientes como la carga infinita del dashboard.
+
+
+
+## 19. Implementación de Comandos por WhatsApp (Fase 1: Texto)
+
+Siguiendo la solicitud del usuario de permitir el control de GENIA mediante WhatsApp, se inició la implementación de esta funcionalidad, comenzando por los comandos de texto.
+
+*   **Objetivo:** Permitir a los usuarios enviar comandos de texto a un número de WhatsApp asociado a GENIA, que el sistema interpretará y ejecutará, devolviendo una respuesta por el mismo medio.
+*   **Configuración del Webhook (Twilio):**
+    *   Se instruyó al usuario para configurar la URL `https://genia-backendmpc.onrender.com/webhook/twilio/whatsapp` (proporcionada por el usuario como la URL del backend desplegado) en la sección "WHEN A MESSAGE COMES IN" de la Sandbox de Twilio, usando el método `HTTP POST`.
+    *   El usuario confirmó la correcta configuración.
+*   **Implementación del Endpoint Webhook (Backend):**
+    *   Se creó el archivo `/home/ubuntu/genia_backendMPC/app/webhooks/twilio_webhook.py`.
+    *   Se implementó un endpoint FastAPI `POST /webhook/twilio/whatsapp`.
+    *   Incluye validación de la firma de Twilio usando `RequestValidator` y el `TWILIO_AUTH_TOKEN`.
+    *   Extrae el número del remitente (`From`), el cuerpo del mensaje (`Body`) y la información de medios (para Fase 2).
+    *   Utiliza `BackgroundTasks` de FastAPI para procesar el comando de forma asíncrona, respondiendo inmediatamente a Twilio con un TwiML vacío para evitar timeouts.
+*   **Procesador de Mensajes:**
+    *   Se creó `/home/ubuntu/genia_backendMPC/app/processing/message_processor.py`.
+    *   La función `process_text_message` estructura inicialmente los datos del mensaje de texto.
+    *   Se incluyó `process_media_message` como marcador para la Fase 2 (audio).
+*   **Intérprete de Comandos (OpenAI vía MCP):**
+    *   Se creó `/home/ubuntu/genia_backendMPC/app/nlp/command_interpreter.py`.
+    *   Define `AVAILABLE_TOOLS` (generate_text, keyword_research, analyze_sentiment, send_whatsapp_message, unknown_command) con descripciones y parámetros.
+    *   La función `build_interpretation_prompt` crea un prompt específico para que OpenAI (vía MCP) devuelva un JSON con `intent` y `parameters`.
+    *   La función `interpret_command` llama al servidor MCP de OpenAI usando `mcp_client_instance`, envía el prompt, recibe la respuesta y parsea el JSON resultante, validando el `intent`.
+*   **Ejecutor de Tareas:**
+    *   Se creó `/home/ubuntu/genia_backendMPC/app/tasks/task_executor.py`.
+    *   La función `execute_task` recibe el comando interpretado.
+    *   Utiliza un `if/elif` para mapear el `intent` a la herramienta correspondiente (OpenAITool, SEOAnalysisTool, WhatsAppAnalysisTool, WhatsAppTool), las cuales ya usan MCP internamente.
+    *   Ejecuta la herramienta con los `parameters` extraídos.
+    *   Prepara un mensaje de respuesta (`reply_message`) basado en el resultado de la tarea.
+    *   Utiliza `WhatsAppTool` (vía MCP) para enviar el `reply_message` de vuelta al `sender_number` original.
+    *   Maneja el intent `unknown_command` y errores generales.
+*   **Integración en `main.py`:**
+    *   Se importó el `twilio_webhook_router` en `/home/ubuntu/genia_backendMPC/main.py`.
+    *   Se incluyó el router en la aplicación FastAPI con el prefijo `/webhook`.
+*   **Estado:** La implementación básica para recibir mensajes de texto, interpretarlos con OpenAI y ejecutar tareas (incluyendo enviar respuestas) está completa. Aún no se han realizado pruebas de extremo a extremo con mensajes reales enviados por el usuario.
+
+
+
+
+## 20. Planificación de Próximas Fases
+
+Tras completar la Fase 1 (comandos de texto por WhatsApp), se planifican las siguientes fases para añadir las funcionalidades solicitadas por el usuario:
+
+**Fase 2: Soporte para Comandos de Audio por WhatsApp**
+
+1.  **Selección de Servicio Speech-to-Text (STT):**
+    *   Evaluar opciones como OpenAI Whisper (posiblemente vía API o un nuevo servidor MCP), AssemblyAI, Google Cloud Speech-to-Text.
+    *   **Recomendación inicial:** Explorar OpenAI Whisper por su potencial integración con la infraestructura existente.
+2.  **Implementación del Servidor MCP para STT (si aplica):**
+    *   Si se opta por un servicio externo o una instancia dedicada de Whisper, crear un nuevo microservicio (`genia-mcp-server-stt`) similar a los anteriores.
+    *   Definir capacidad (ej. `transcribe_audio`) y parámetros (`audio_url` o `audio_data`).
+3.  **Modificación del Procesador de Mensajes (`message_processor.py`):**
+    *   En `process_media_message`:
+        *   Implementar lógica para descargar el archivo de audio desde `media_url` (proporcionado por Twilio).
+        *   Llamar al servicio STT (directamente o vía MCP) con el audio descargado.
+        *   Devolver el texto transcrito.
+    *   Manejar errores de descarga o transcripción.
+4.  **Actualización del Webhook (`twilio_webhook.py`):**
+    *   Cuando se reciba un mensaje multimedia de tipo audio (`media_type` relevante):
+        *   Llamar a `process_media_message` para obtener el texto transcrito.
+        *   Si la transcripción es exitosa, pasar el texto transcrito a la tarea de fondo `process_command_background` (la misma que usan los mensajes de texto).
+5.  **Pruebas:** Probar enviando mensajes de audio a la Sandbox de Twilio y verificar que se interpreten y ejecuten correctamente.
+
+**Fase 3: Integración de Envío de Correos (Brevo)**
+
+1.  **Implementación del Servidor MCP para Email (Brevo):**
+    *   Crear un nuevo microservicio (`genia-mcp-server-brevo` o `genia-mcp-server-email`).
+    *   **Credenciales:** Utilizar las credenciales SMTP de Brevo ya disponibles en el `.env` del backend (o moverlas al `.env` del nuevo servidor).
+    *   **Tecnología:** FastAPI.
+    *   **Endpoint:** `/mcp`.
+    *   **Capacidad:** `send_email`.
+    *   **Parámetros (`metadata`):** `to_email`, `subject`, `html_content` (o `text_content`).
+    *   **Lógica:** Usar `smtplib` de Python o la librería `sib-api-v3-sdk` de Brevo para enviar el correo.
+    *   **Respuesta SSE:** `SimpleMessage` confirmando éxito (`status: sent`) o error.
+2.  **Integración en Backend:**
+    *   Añadir la URL del nuevo servidor MCP de email a `SERVER_URLS` en `app/mcp_client/client.py`.
+    *   Crear una nueva herramienta `app/tools/email_tool.py` que use `mcp_client_instance` para llamar a la capacidad `send_email` del servidor MCP.
+    *   Añadir `send_email` a `AVAILABLE_TOOLS` en `app/nlp/command_interpreter.py` con su descripción y parámetros.
+    *   Actualizar `app/tasks/task_executor.py` para manejar el intent `send_email`, llamar a `EmailTool` y enviar la respuesta correspondiente al usuario por WhatsApp.
+3.  **Pruebas:** Probar la funcionalidad con comandos de WhatsApp como "envía un email a ejemplo@dominio.com con asunto Prueba y cuerpo Hola".
+
+**Fase 4: Uso de Credenciales de Usuario (Pendiente de Diseño Detallado)**
+
+*   Diseñar un sistema seguro para almacenar y gestionar las claves API/tokens proporcionados por los usuarios para sus herramientas conectadas (OpenAI, Twilio, Stripe, Brevo, etc.).
+*   Modificar los servidores MCP y/o el `task_executor` para recuperar y utilizar las credenciales específicas del usuario (`sender_number` podría ser la clave para buscar las credenciales) al ejecutar una tarea.
+
+**Próximo Paso Inmediato:** Confirmar este plan con el usuario y proceder con la **Fase 2: Soporte para Comandos de Audio por WhatsApp**, comenzando por la selección e integración del servicio STT.
+
