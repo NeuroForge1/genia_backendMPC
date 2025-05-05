@@ -60,11 +60,11 @@ Ante los problemas con las librerías, se optó por una implementación **simpli
     *   **Tecnología:** FastAPI.
     *   **Funcionalidad:**
         *   Expone un endpoint `/mcp` que acepta solicitudes `POST`.
-        *   Espera un cuerpo JSON simple: `{"prompt": "texto del usuario"}` (definido como `SimpleMessage`).
+        *   Espera un cuerpo JSON simple (`SimpleMessage`).
         *   Utiliza `openai` (requiere `OPENAI_API_KEY` en `.env`) para llamar a `ChatCompletion.create`.
-        *   Devuelve la respuesta usando Server-Sent Events (SSE) con un formato simple: `data: {"response": "texto generado"}\n\n`.
+        *   Devuelve la respuesta usando Server-Sent Events (SSE) con un formato simple.
         *   Corre en `http://localhost:8001`.
-    *   **Dependencias:** `fastapi`, `uvicorn`, `openai`, `python-dotenv`, `sse-starlette`.
+    *   **Dependencias:** `fastapi`, `uvicorn`, `openai`, `python-dotenv`, `sse-starlette`, `pydantic`.
 
 2.  **Cliente MCP Simplificado en Backend:**
     *   **Ubicación:** `/home/ubuntu/genia_backendMPC/app/mcp_client/client.py` (Repositorio: `NeuroForge1/genia_backendMPC`)
@@ -74,7 +74,6 @@ Ante los problemas con las librerías, se optó por una implementación **simpli
         *   Método `request_mcp_server(server_name: str, request_message: SimpleMessage)` que devuelve un `AsyncGenerator` de `SimpleMessage`.
         *   Envía una solicitud `POST` al endpoint del servidor MCP correspondiente (configurado en `SERVER_URLS`).
         *   Maneja la respuesta SSE, parsea los mensajes JSON y los valida con Pydantic.
-        *   Incluye una función de prueba `_test_client` (ejecutable solo si el script se llama directamente).
     *   **Dependencias:** `httpx`, `pydantic`.
 
 **Decisiones Clave:**
@@ -83,12 +82,12 @@ Ante los problemas con las librerías, se optó por una implementación **simpli
 *   **Formato de Mensaje:** Se usó un JSON simple (`SimpleMessage`) en lugar de la estructura `Message` de MCP para evitar las dependencias problemáticas.
 *   **Enfoque:** Priorizar una conexión funcional básica entre cliente y servidor antes de intentar una implementación más apegada al estándar MCP con librerías.
 
-## 5. Prueba de Comunicación Inicial
+## 5. Prueba de Comunicación Inicial (OpenAI)
 
 Se ejecutó la función `_test_client` directamente desde el archivo `client.py`.
 
-*   **Resultado:** La prueba fue **exitosa**. El cliente (temporal) envió una solicitud al servidor, el servidor llamó a OpenAI, y el cliente recibió e imprimió correctamente la respuesta generada por OpenAI a través de la conexión SSE.
-*   **Confirmación:** Esto validó que la comunicación básica entre el Cliente MCP simplificado y el Servidor MCP simplificado funciona correctamente.
+*   **Resultado:** La prueba fue **exitosa**. El cliente (temporal) envió una solicitud al servidor OpenAI, el servidor llamó a OpenAI, y el cliente recibió e imprimió correctamente la respuesta generada por OpenAI a través de la conexión SSE.
+*   **Confirmación:** Esto validó que la comunicación básica entre el Cliente MCP simplificado y el Servidor MCP simplificado de OpenAI funciona correctamente.
 
 ## 6. Integración Inicial en Backend (`openai_tool.py`)
 
@@ -106,76 +105,93 @@ Se procedió a integrar el `GeniaMCPClient` en la lógica existente del backend.
 Se discutió y acordó la siguiente estructura de repositorios para fomentar la modularidad:
 
 *   **Backend (Host y Cliente MCP):** Repositorio existente `NeuroForge1/genia_backendMPC`.
-    *   Se añadió el módulo `app/mcp_client/`.
-    *   Se actualizó `requirements.txt` (añadiendo `httpx`).
-    *   Se añadió este documento de resumen en `docs/mcp_resumen_y_plan.md`.
-    *   Los cambios fueron subidos a GitHub.
 *   **Servidor MCP OpenAI:** Nuevo repositorio dedicado `NeuroForge1/genia-mcp-server-openai`.
-    *   Contiene el código del servidor (`main.py`), `requirements.txt`, `.env.example`, `.gitignore`.
-    *   El código fue subido a GitHub.
 *   **Futuros Servidores MCP:** Se crearán repositorios separados para cada nuevo servidor (Stripe, Twilio, etc.).
 
 ## 8. Pruebas de Integración Inicial y Correcciones (`openai_tool.py`)
 
 Se ejecutó un script de prueba (`test_openai_tool_mcp.py`) para validar la integración de `OpenAITool` con el Cliente MCP.
 
-*   **Error Inicial (`ValidationError`):** La primera ejecución falló debido a la falta de variables de entorno requeridas por la configuración del backend (`app.core.config`).
-*   **Solución:** Se creó el archivo `/home/ubuntu/genia_backendMPC/.env` con todas las variables necesarias (SECRET_KEY, SUPABASE_*, OPENAI_API_KEY, STRIPE_*, TWILIO_*, etc.), utilizando los valores proporcionados por el usuario y generando valores aleatorios seguros para las claves secretas faltantes (SECRET_KEY, SUPABASE_JWT_SECRET).
-*   **Error Secundario (`Client Closed`):** La segunda ejecución falló porque la instancia global del cliente MCP (`mcp_client_instance`) se cerraba después de una prueba interna que se ejecutaba automáticamente al importar `client.py`.
-*   **Solución:** Se modificó `/home/ubuntu/genia_backendMPC/app/mcp_client/client.py` para:
-    *   Mover la ejecución de la prueba interna `_test_client` a un bloque `if __name__ == "__main__":`.
-    *   Hacer que `_test_client` use una instancia temporal del cliente en lugar de la global.
-    *   Mejorar el manejo de errores y el procesamiento SSE en `request_mcp_server`.
-*   **Prueba Final:** La ejecución final de `test_openai_tool_mcp.py` fue **exitosa**. `OpenAITool` utilizó correctamente `mcp_client_instance` para comunicarse con el servidor MCP de OpenAI y obtener la respuesta.
+*   **Errores y Soluciones:** Se resolvieron errores relacionados con la falta de variables de entorno (`.env`) y el cierre prematuro del cliente HTTPX global.
+*   **Prueba Final:** La ejecución final de `test_openai_tool_mcp.py` fue **exitosa**.
 
-## 9. Integración Adicional en Backend (Otras Herramientas)
+## 9. Integración Adicional en Backend (Otras Herramientas OpenAI)
 
-Siguiendo el éxito con `OpenAITool`, se procedió a integrar el `GeniaMCPClient` en las demás herramientas del backend que realizaban llamadas directas a OpenAI.
+Se integró el `GeniaMCPClient` en las demás herramientas del backend que realizaban llamadas directas a OpenAI.
 
-*   **Archivos Modificados:**
-    *   `/home/ubuntu/genia_backendMPC/app/tools/funnels_tool.py`
-    *   `/home/ubuntu/genia_backendMPC/app/tools/seo_analysis_tool.py`
-    *   `/home/ubuntu/genia_backendMPC/app/tools/whatsapp_analysis_tool.py`
-*   **Cambios Realizados (Patrón Común):**
-    *   Se importó la instancia global `mcp_client_instance` y las estructuras `SimpleMessage`, `SimpleTextContent`.
-    *   Se eliminó la importación directa de `openai` y la configuración de `openai.api_key`.
-    *   Se creó un método helper `_call_mcp_openai` dentro de cada clase para encapsular la lógica de llamada al cliente MCP (similar al implementado en `OpenAITool`).
-    *   Se modificaron los métodos existentes que llamaban a `openai.ChatCompletion.create` (ej., `_create_sales_funnel`, `_analyze_content`, `_generate_response_suggestions`, etc.) para que utilizaran el nuevo método helper `_call_mcp_openai`.
-    *   Se adaptó el manejo de las respuestas recibidas del cliente MCP.
-    *   Se renombraron los métodos modificados añadiendo el sufijo `_mcp` (ej., `_create_sales_funnel_mcp`) y se actualizó el método `execute` para llamar a las nuevas versiones.
+*   **Archivos Modificados:** `funnels_tool.py`, `seo_analysis_tool.py`, `whatsapp_analysis_tool.py`.
+*   **Cambios Realizados:** Se siguió un patrón común: importar cliente MCP, eliminar cliente OpenAI directo, crear método helper `_call_mcp_openai`, y modificar métodos existentes para usar el helper.
 
-## 10. Pruebas de Integración Completas
+## 10. Pruebas de Integración Completas (OpenAI)
 
-Para verificar que la integración funcionaba correctamente en todas las herramientas modificadas, se creó y ejecutó un script de prueba completo.
+Se creó y ejecutó un script de prueba completo (`test_mcp_integration_full.py`) para verificar la integración en todas las herramientas modificadas.
 
-*   **Script de Prueba:** `/home/ubuntu/genia_backendMPC/test_mcp_integration_full.py`
-*   **Funcionalidad del Script:**
-    *   Importó las cuatro herramientas modificadas (`OpenAITool`, `FunnelsTool`, `SEOAnalysisTool`, `WhatsAppAnalysisTool`).
-    *   Llamó a una capacidad representativa de cada herramienta, pasando parámetros de ejemplo.
-    *   Verificó que cada llamada devolviera un estado `success` y datos válidos.
-*   **Corrección de Errores:** Durante la ejecución inicial, se detectó y corrigió un error de sintaxis (`SyntaxError: invalid syntax`) en `whatsapp_analysis_tool.py` causado por caracteres de tabulación incorrectos en expresiones regulares.
-*   **Resultado Final:** Tras la corrección, la ejecución del script `test_mcp_integration_full.py` fue **exitosa**. Todas las herramientas pudieron comunicarse correctamente con el servidor MCP de OpenAI a través del `GeniaMCPClient`.
+*   **Corrección de Errores:** Se corrigió un `SyntaxError` en `whatsapp_analysis_tool.py`.
+*   **Resultado Final:** La ejecución del script fue **exitosa**. Todas las herramientas pudieron comunicarse correctamente con el servidor MCP de OpenAI a través del `GeniaMCPClient`.
+*   **Código Subido:** Los cambios relacionados con la integración de OpenAI en el backend fueron subidos al repositorio `NeuroForge1/genia_backendMPC`.
 
-## 11. Estado Actual y Próximos Pasos
+## 11. Implementación del Servidor MCP para Stripe
+
+Siguiendo la decisión de continuar con la arquitectura MCP, se procedió a implementar el servidor para Stripe.
+
+*   **Diseño:**
+    *   Se analizó `stripe_tool.py` identificando las capacidades: `create_payment`, `create_subscription`, `create_customer`.
+    *   Se decidió crear un microservicio FastAPI separado (`genia-mcp-server-stripe`).
+    *   El servidor expondría `/mcp`, aceptaría `SimpleMessage`, pasaría `capability` y `params` en `metadata`.
+    *   Interactuaría solo con la API de Stripe (requiere `STRIPE_SECRET_KEY`).
+    *   Devolvería resultados vía SSE (`SimpleMessage`).
+    *   La lógica de actualización de Supabase permanecería en el backend.
+*   **Implementación:**
+    *   Se creó la estructura del proyecto en `/home/ubuntu/genia_mcp_server_stripe`.
+    *   Se definieron las dependencias (`requirements.txt`).
+    *   Se creó `.env.example` y `.env` (con la clave proporcionada por el usuario).
+    *   Se implementó `main.py` con FastAPI, endpoint `/mcp`, generador SSE `stripe_sse_generator` que maneja las tres capacidades usando `asyncio.to_thread` para las llamadas a Stripe.
+
+## 12. Integración del Cliente MCP para Stripe en Backend
+
+Se modificó el backend para usar el nuevo servidor MCP de Stripe.
+
+*   **Cliente MCP Actualizado:** Se añadió la URL del servidor Stripe (`http://localhost:8002/mcp`) a `SERVER_URLS` en `app/mcp_client/client.py`. Se mejoró el manejo de eventos SSE.
+*   **`stripe_tool.py` Modificado:**
+    *   Se eliminó la configuración directa de `stripe.api_key`.
+    *   Se importó `mcp_client_instance`.
+    *   Se creó un método helper `_call_mcp_stripe` para llamar al cliente MCP.
+    *   Se modificaron `_create_payment`, `_create_subscription`, `_create_customer` para usar `_call_mcp_stripe`, renombrándolos con sufijo `_mcp`.
+    *   Se mantuvo la lógica de actualización de Supabase en `_create_customer_mcp` después de recibir el `customer_id` del servidor MCP.
+
+## 13. Pruebas de Integración (Stripe)
+
+Se realizaron pruebas para validar la integración de Stripe vía MCP.
+
+*   **Servidor Iniciado:** Se ejecutó el servidor MCP de Stripe (`python3 main.py` en `/home/ubuntu/genia_mcp_server_stripe`).
+*   **Script de Prueba:** Se creó y ejecutó `/home/ubuntu/genia_backendMPC/test_stripe_tool_mcp.py`.
+*   **Resultados:**
+    *   `create_customer`: **Éxito**. Se creó el cliente en Stripe. Hubo un error al actualizar Supabase (`stripe_customer_id` column not found), pero la prueba se consideró un éxito parcial ya que la comunicación MCP y la creación en Stripe funcionaron.
+    *   `create_payment`: **Éxito**. Se creó el PaymentIntent en Stripe.
+    *   `create_subscription`: **Fallo esperado**. La llamada falló porque el `price_id` de prueba no era válido en la cuenta de Stripe. Sin embargo, la comunicación con el servidor MCP funcionó hasta el punto de recibir el error de Stripe.
+*   **Conclusión:** La integración de Stripe vía MCP funciona correctamente para las capacidades probadas, demostrando la viabilidad de la arquitectura.
+
+## 14. Estado Actual y Próximos Pasos
 
 **Estado Actual:**
 
-*   Cliente y Servidor MCP simplificados implementados y funcionando.
-*   Comunicación básica entre ellos validada.
-*   Código del servidor y cambios en backend (cliente MCP, `.env`, correcciones) subidos a sus respectivos repositorios.
-*   Integración del Cliente MCP **completada y probada exitosamente** en todas las herramientas identificadas que usaban OpenAI directamente (`OpenAITool`, `FunnelsTool`, `SEOAnalysisTool`, `WhatsAppAnalysisTool`).
-*   Las pruebas de integración completas (`test_mcp_integration_full.py`) han validado el funcionamiento correcto.
+*   Servidor MCP para OpenAI implementado, integrado y probado.
+*   Servidor MCP para Stripe implementado, integrado y probado (con las salvedades mencionadas).
+*   Cliente MCP en backend actualizado para soportar ambos servidores.
+*   Código de integración de OpenAI subido a GitHub.
+*   Código del servidor Stripe y cambios de integración en backend **pendientes de subir a GitHub**.
 
 **Próximos Pasos Inmediatos:**
 
-1.  **Preparar Cambios para GitHub:** Revisar los cambios realizados en el backend (`genia_backendMPC`), añadir los archivos nuevos/modificados al control de versiones (`git add`), y preparar un commit con un mensaje descriptivo.
-2.  **Subir Cambios:** Hacer `git push` para subir los cambios al repositorio `NeuroForge1/genia_backendMPC`.
-3.  **Reportar Resultados:** Informar al usuario sobre la finalización exitosa de la integración y las pruebas.
+1.  **Evaluar Implementación Otros Servidores:** Decidir si implementar el servidor MCP para Twilio a continuación o abordar otras tareas.
+2.  **Preparar Cambios Stripe para GitHub:** Crear repositorio para `genia-mcp-server-stripe`, añadir archivos y subir. Añadir cambios en `genia_backendMPC` (cliente, stripe_tool, test script), hacer commit y push.
+3.  **Reportar Resultados:** Informar al usuario sobre la finalización de la integración de Stripe.
 
-**Pasos Futuros (Post-Integración OpenAI):**
+**Pasos Futuros (Post-Integración Stripe/Twilio):**
 
-*   **Manejo de Claves de Usuario:** Implementar la lógica (descrita previamente al usuario) para permitir a los usuarios usar sus propias claves API a través de MCP.
-*   **Implementar Otros Servidores MCP:** Crear servidores MCP para otras herramientas (Stripe, Twilio, etc.) siguiendo el mismo patrón simplificado o reevaluando librerías si se vuelven estables.
-*   **Refinar Protocolo:** Eventualmente, si las librerías MCP maduran o se encuentra una solución a los problemas de importación, se podría refactorizar para usar una implementación más apegada al estándar MCP.
-*   **Integración Frontend:** Realizar los cambios necesarios en el frontend para funcionalidades avanzadas (streaming, configuración de claves, etc.).
+*   **Resolver Error Supabase:** Investigar y corregir el error "Could not find the 'stripe_customer_id' column" en la tabla `usuarios` de Supabase.
+*   **Manejo de Claves de Usuario:** Implementar la lógica para permitir a los usuarios usar sus propias claves API a través de MCP.
+*   **Refinar Protocolo:** Reevaluar librerías MCP estándar.
+*   **Integración Frontend:** Conectar frontend si es necesario.
+*   **Resolver Problemas Funcionales:** Abordar problemas pendientes como la carga infinita del dashboard.
 

@@ -20,7 +20,8 @@ class SimpleMessage(BaseModel):
 # TODO: Cargar URLs de servidores desde configuración (variables de entorno)
 SERVER_URLS = {
     "openai": "http://localhost:8001/mcp", # URL del servidor MCP simplificado para OpenAI
-    # Añadir URLs para otros servidores MCP (Stripe, Twilio, etc.)
+    "stripe": "http://localhost:8002/mcp", # URL del servidor MCP simplificado para Stripe
+    # Añadir URLs para otros servidores MCP (Twilio, etc.)
 }
 
 # --- Cliente MCP Simplificado ---
@@ -63,6 +64,17 @@ class GeniaMCPClient:
                         current_event = line.split(":", 1)[1].strip()
                     elif line.startswith("data:"):
                         data_str = line.split(":", 1)[1].strip()
+                        # Assume event is 'message' or 'error' if not explicitly set (simple server might omit event line)
+                        if current_event is None:
+                            try:
+                                temp_data = json.loads(data_str)
+                                if temp_data.get('role') == 'error':
+                                    current_event = 'error'
+                                else:
+                                    current_event = 'message'
+                            except: # If parsing fails, assume it's not a standard message
+                                pass 
+                                
                         if current_event == "message" or current_event == "error":
                             try:
                                 message_data = json.loads(data_str)
