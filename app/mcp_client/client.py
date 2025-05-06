@@ -66,7 +66,7 @@ class MCPClient:
 
         # logger.info(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {json.dumps(request_data)}") # Reemplazado por log detallado/truncado
         try:
-            async with self._http_client.stream("POST", server_url, json=request_data, headers={\'Accept\': \'text/event-stream\'}) as response:
+            async with self._http_client.stream("POST", server_url, json=request_data, headers={'Accept': 'text/event-stream'}) as response:
                 # Verificar si la conexión SSE fue exitosa
                 if response.status_code != 200:
                      error_content = await response.aread()
