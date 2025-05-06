@@ -54,13 +54,19 @@ class MCPClient:
             raise ValueError(f"URL para el servidor MCP 	'{server_name}'	 no configurada.")
 
         server_url = SERVER_URLS[server_name]
-        # Use model_dump instead of model_dump_json for httpx content
-        request_data = request_message.model_dump(mode='json') 
+        # Use model_dump instead of model_dump_json for httpx content        request_data = request_message.model_dump(mode=\'json\') 
 
-        logger.info(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {json.dumps(request_data)}")
+        # Log detallado del base64 antes de enviar
+        if server_name == "openai" and request_data.get("metadata", {}).get("parameters", {}).get("audio_content_base64"):
+            b64_content = request_data["metadata"]["parameters"]["audio_content_base64"]
+            b64_len = len(b64_content)
+            logger.info(f"Cliente Simplificado (DEBUG): Enviando base64 a OpenAI. Longitud: {b64_len}. Inicio: {b64_content[:100]}... Fin: ...{b64_content[-100:]}")
+        else:
+             logger.info(f"Cliente Simplificado: Enviando POST a {server_url} con datos (sin audio base64 detallado): {json.dumps(request_data)[:500]}...") # Log truncado para otros casos
 
-        try:
-            async with self._http_client.stream("POST", server_url, json=request_data, headers={'Accept': 'text/event-stream'}) as response:
+        # logger.info(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {json.dumps(request_data)}") # Reemplazado por log detallado/truncado
+
+        try:            async with self._http_client.stream("POST", server_url, json=request_data, headers={'Accept': 'text/event-stream'}) as response:
                 
                 # Verificar si la conexión SSE fue exitosa
                 if response.status_code != 200:
