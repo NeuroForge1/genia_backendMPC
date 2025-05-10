@@ -8,7 +8,7 @@ from app.mcp_client.client import MCPClient, SimpleMessage, SimpleTextContent
 # Importar la función para enviar mensajes de WhatsApp
 from app.tools.whatsapp_tool import send_whatsapp_message
 # Importar la herramienta de correo electrónico (anteriormente GmailTool)
-from app.tools.gmail_tool import GmailTool 
+from app.tools.gmail_tool import GmailTool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,8 +48,7 @@ class TaskExecutor:
                 mcp_server_name = "openai"
                 topic = main_parameters.get("topic", "algo interesante")
                 request_content_text = f"Genera un texto sobre: {topic}"
-                # Usar el modelo especificado por el command_interpreter o uno por defecto
-                request_metadata = {"model": interpreted_data.get("metadata", {}).get("model", "gpt-4o")} 
+                request_metadata = {"model": interpreted_data.get("metadata", {}).get("model", "gpt-4o")}
 
             elif main_command == "search_keywords":
                 mcp_server_name = "openai"
@@ -71,18 +70,16 @@ class TaskExecutor:
                         result_text = f"Error al intentar enviar mensaje a {recipient}: {send_err}"
                 else:
                     result_text = "Faltan parámetros (recipient_number o message_text) para enviar WhatsApp."
-                # Como la acción ya se completó, enviamos el resultado y retornamos.
-                # No hay acción secundaria después de un send_whatsapp explícito usualmente.
                 formatted_sender = sender_number if sender_number.startswith("whatsapp:") else f"whatsapp:{sender_number}"
                 await send_whatsapp_message(formatted_sender, result_text)
                 return
 
             elif main_command == "unknown":
                 result_text = "Lo siento, no entendí qué acción realizar."
-                execution_successful = True 
+                execution_successful = True
 
             else:
-                result_text = f"Comando 	Ó{main_command}	" no reconocido."
+                result_text = f"Comando 	Ó{main_command}	 no reconocido."
                 execution_successful = True
 
             if mcp_server_name and request_content_text:
@@ -103,7 +100,7 @@ class TaskExecutor:
                 if response_parts:
                     result_text = "".join(response_parts)
                     execution_successful = True
-                elif execution_successful is not False:
+                elif not execution_successful:
                     result_text = f"No se recibió respuesta del servicio {mcp_server_name} para el comando {main_command}."
                     execution_successful = False
 
@@ -116,44 +113,37 @@ class TaskExecutor:
             result_text = f"Error inesperado al ejecutar {main_command}."
             execution_successful = False
 
-        # Enviar la respuesta del comando principal al usuario original por WhatsApp
-        logger.info(f"TaskExecutor: Enviando resultado para comando 	Ó{main_command}	" a {sender_number}: {result_text[:100]}...")
+        logger.info(f"TaskExecutor: Enviando resultado para comando 	Ó{main_command}	 a {sender_number}: {result_text[:100]}...")
         formatted_sender = sender_number if sender_number.startswith("whatsapp:") else f"whatsapp:{sender_number}"
         try:
             await send_whatsapp_message(formatted_sender, result_text)
         except Exception as send_err:
-             logger.error(f"TaskExecutor: Fallo al enviar respuesta principal a {sender_number}: {send_err}")
+            logger.error(f"TaskExecutor: Fallo al enviar respuesta principal a {sender_number}: {send_err}")
 
-        # Manejar acción secundaria de envío de correo si existe y el comando principal fue exitoso
         if execution_successful and secondary_action == "send_email":
             to_address = secondary_parameters.get("to_address")
-            email_subject = secondary_parameters.get("subject", f"Resultado de tu solicitud: {main_command}") # Asunto por defecto
+            email_subject = secondary_parameters.get("subject", f"Resultado de tu solicitud: {main_command}")
             
-            if to_address and result_text: # result_text es el cuerpo del correo
+            if to_address and result_text:
                 logger.info(f"TaskExecutor: Intentando acción secundaria: enviar correo a {to_address}")
                 email_params = {
                     "to_address": to_address,
                     "subject": email_subject,
-                    "body_text": result_text # El resultado del comando principal es el cuerpo del correo
-                    # "from_address" se tomará del default en email_tool si no se especifica aquí
+                    "body_text": result_text
                 }
                 try:
-                    # Usar la instancia de email_tool
                     email_response = await self.email_tool.execute(user_id=sender_number, capability="send_email", params=email_params)
                     if email_response.get("status") == "success":
                         logger.info(f"TaskExecutor: Correo enviado exitosamente a {to_address}. Respuesta: {email_response}")
-                        # Opcional: notificar al usuario de WhatsApp que el correo fue enviado
                         await send_whatsapp_message(formatted_sender, f"Además, el resultado ha sido enviado a {to_address}.")
                     else:
-                        logger.error(f"TaskExecutor: Fallo al enviar correo a {to_address}. Error: {email_response.get(	"message	")}")
-                        # Opcional: notificar al usuario del fallo del envío del correo
+                        logger.error(f"TaskExecutor: Fallo al enviar correo a {to_address}. Error: {email_response.get("message")}")
                         await send_whatsapp_message(formatted_sender, f"No pude enviar el resultado a {to_address} debido a un error.")
                 except Exception as email_err:
                     logger.exception(f"TaskExecutor: Excepción al intentar enviar correo a {to_address}: {email_err}")
                     await send_whatsapp_message(formatted_sender, f"Ocurrió un error inesperado al intentar enviar el resultado a {to_address}.")
             else:
-                logger.warning(f"TaskExecutor: No se pudo enviar correo. Falta destinatario (	Ó{to_address}	") o cuerpo (	Ó{result_text}	").")
-                if to_address: # Si había destinatario pero no cuerpo (comando principal falló)
-                     await send_whatsapp_message(formatted_sender, f"No pude generar el contenido para enviar a {to_address}.")
-
+                logger.warning(f"TaskExecutor: No se pudo enviar correo. Falta destinatario (	Ó{to_address}	) o cuerpo (	Ó{result_text}	).")
+                if to_address:
+                    await send_whatsapp_message(formatted_sender, f"No pude generar el contenido para enviar a {to_address}.")
 
