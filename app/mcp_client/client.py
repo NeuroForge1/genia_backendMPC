@@ -54,8 +54,8 @@ class MCPClient:
             raise ValueError(f"URL para el servidor MCP 	'{server_name}'	 no configurada.")
 
         server_url = SERVER_URLS[server_name]
-        # Use model_dump instead of model_dump_json for httpx content        request_data = request_message.model_dump(mode=\'json\') 
-
+        # Use model_dump instead of model_dump_json for httpx content
+        request_data = request_message.model_dump(mode='json')
         # Restaurado log simple para evitar NameError
         logger.info(f"Cliente Simplificado: Enviando POST a {server_url} con datos: {json.dumps(request_data)[:500]}...") # Log truncado para evitar sobrecarga
 
