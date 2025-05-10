@@ -137,7 +137,7 @@ class TaskExecutor:
                         logger.info(f"TaskExecutor: Correo enviado exitosamente a {to_address}. Respuesta: {email_response}")
                         await send_whatsapp_message(formatted_sender, f"Además, el resultado ha sido enviado a {to_address}.")
                     else:
-                        logger.error(f"TaskExecutor: Fallo al enviar correo a {to_address}. Error: {email_response.get("message")}")
+                        logger.error(f"TaskExecutor: Fallo al enviar correo a {to_address}. Error: {email_response.get('message')}")
                         await send_whatsapp_message(formatted_sender, f"No pude enviar el resultado a {to_address} debido a un error.")
                 except Exception as email_err:
                     logger.exception(f"TaskExecutor: Excepción al intentar enviar correo a {to_address}: {email_err}")
