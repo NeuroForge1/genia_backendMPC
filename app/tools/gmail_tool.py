@@ -5,7 +5,7 @@ from app.tools.base_tool import BaseTool
 # from app.db.supabase_manager import get_supabase_client # No longer needed for Gmail tokens
 
 # Define la URL del servidor MCP de correo electrónico de GENIA
-GENIA_EMAIL_SERVICE_URL = "https://genia-mcp-server-email.onrender.com/send-email"
+GENIA_EMAIL_SERVICE_URL = "https://genia-mcp-server-email.onrender.com/mcp/send_email"
 DEFAULT_SENDER_EMAIL_GENIA = "mendezchristhian1@gmail.com" # Remitente por defecto, como se configuró en Render
 
 class GmailTool(BaseTool): # Renombrar la clase podría ser una opción, pero por ahora modificamos la existente
