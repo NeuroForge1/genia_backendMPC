@@ -65,8 +65,14 @@ JSON de respuesta:
                     try:
                         raw_response_text = response.content.text.strip()
                         logger.info(f"CommandInterpreter: Respuesta cruda de OpenAI: {raw_response_text}")
-                        command_data = json.loads(raw_response_text)
-                        
+                        # Limpiar marcadores de bloque de código Markdown si están presentes
+                        if raw_response_text.startswith("```json"):
+                            raw_response_text = raw_response_text[7:] # Eliminar ```json
+                        if raw_response_text.endswith("```"):
+                            raw_response_text = raw_response_text[:-3] # Eliminar ```
+                        raw_response_text = raw_response_text.strip() # Asegurar que no haya espacios en blanco alrededor
+
+                        command_data = json.loads(raw_response_text) 
                         # Validar y asignar comando principal
                         if "main_command" in command_data and isinstance(command_data["main_command"], str):
                             interpreted_result["main_command"] = command_data["main_command"]
