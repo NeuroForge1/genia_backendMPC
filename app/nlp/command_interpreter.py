@@ -21,7 +21,7 @@ Responde SOLO con un objeto JSON con las siguientes claves:
 - "main_command": (string) El comando principal identificado.
 - "main_parameters": (object) Parámetros para el comando principal.
 - "secondary_action": (string, opcional) Si se detecta una solicitud de envío de correo, debe ser "send_email".
-- "secondary_parameters": (object, opcional) Parámetros para la acción secundaria "send_email", que debe incluir "to_address" (string, la dirección de correo del destinatario) y opcionalmente "subject" (string, si el usuario lo especifica).
+- "secondary_parameters": (object, opcional) Parámetros para la acción secundaria "send_email", que debe incluir "to_address" (string, la dirección de correo del destinatario EXACTAMENTE COMO APARECE EN LA SOLICITUD, SIN MODIFICACIONES NI CORRECCIONES) y opcionalmente "subject" (string, si el usuario lo especifica).
 
 Comandos principales posibles y sus parámetros:
 - generate_text: {{"topic": "string"}}
@@ -30,7 +30,7 @@ Comandos principales posibles y sus parámetros:
 - unknown: (si no se reconoce ningún comando principal de los anteriores)
 
 Acción secundaria posible y sus parámetros:
-- send_email: {{"to_address": "string", "subject": "string"}} (El cuerpo del correo será el resultado del comando principal. El "subject" es opcional y puede ser inferido o genérico si no se especifica).
+- send_email: {{"to_address": "string", "subject": "string"}} (El cuerpo del correo será el resultado del comando principal. El "subject" es opcional y puede ser inferido o genérico si no se especifica. IMPORTANTE: La "to_address" debe ser extraída literalmente del texto del usuario).
 
 Ejemplos de interpretación:
 1. Solicitud: "Crea un poema sobre la luna y envíalo a juan@example.com"
@@ -41,6 +41,8 @@ Ejemplos de interpretación:
    Respuesta JSON: {{"main_command": "search_keywords", "main_parameters": {{"topic": "clima actual"}}}}
 4. Solicitud: "Dime una broma"
    Respuesta JSON: {{"main_command": "generate_text", "main_parameters": {{"topic": "una broma"}}}}
+5. Solicitud: "Envía un correo a mendezchristhian1@gmail.com con el resultado de la búsqueda de 'noticias de IA'"
+   Respuesta JSON: {{"main_command": "search_keywords", "main_parameters": {{"topic": "noticias de IA"}}, "secondary_action": "send_email", "secondary_parameters": {{"to_address": "mendezchristhian1@gmail.com"}}}}
 
 Solicitud del usuario: "{text}"
 
@@ -112,4 +114,5 @@ JSON de respuesta:
             interpreted_result["error"] = f"Unexpected error during interpretation: {e}"
 
         return interpreted_result
+
 
