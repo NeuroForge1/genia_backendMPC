@@ -32,11 +32,14 @@ class SimpleMessage(BaseModel):
 OPENAI_MCP_URL = os.getenv("OPENAI_MCP_URL", "http://localhost:8001/mcp")
 STRIPE_MCP_URL = os.getenv("STRIPE_MCP_URL", "http://localhost:8002/mcp") # Mantener por si se usa
 TWILIO_MCP_URL = os.getenv("TWILIO_MCP_URL", "http://localhost:8003/mcp")
+SCHEDULER_MCP_BASE_URL = os.getenv("SCHEDULER_MCP_BASE_URL", "https://genia-mcp-scheduler.onrender.com") # URL base del Scheduler MCP
+SCHEDULER_MCP_API_TOKEN = os.getenv("SCHEDULER_MCP_API_TOKEN", "a8a9079d7db52778f5d533e67bec8d2fc32915ade48c9528b16b1c7f85a1493d") # Token del Scheduler MCP
 
 SERVER_URLS = {
     "openai": OPENAI_MCP_URL,
     "stripe": STRIPE_MCP_URL,
-    "twilio": TWILIO_MCP_URL
+    "twilio": TWILIO_MCP_URL,
+    "scheduler": SCHEDULER_MCP_BASE_URL # Añadido para el Scheduler
 }
 
 logger.info(f"MCP Server URLs configured: {SERVER_URLS}")
@@ -50,8 +53,8 @@ class MCPClient:
     async def request_mcp_server(self, server_name: str, request_message: SimpleMessage) -> AsyncGenerator[SimpleMessage, None]:
         """Envía una solicitud a un servidor MCP simplificado vía POST y devuelve un generador asíncrono de mensajes SSE."""
         if server_name not in SERVER_URLS or not SERVER_URLS[server_name]:
-            logger.error(f"URL para el servidor MCP 	'{server_name}'	 no configurada o vacía.")
-            raise ValueError(f"URL para el servidor MCP 	'{server_name}'	 no configurada.")
+            logger.error(f"URL para el servidor MCP \t'{server_name}'\t no configurada o vacía.")
+            raise ValueError(f"URL para el servidor MCP \t'{server_name}'\t no configurada.")
 
         server_url = SERVER_URLS[server_name]
         # Use model_dump instead of model_dump_json for httpx content
@@ -103,8 +106,6 @@ class MCPClient:
                                 logger.error(f"Cliente Simplificado: Error al parsear mensaje {current_event} de {server_name}: {parse_error} - Data: {data_str}")
                         elif current_event == "end":
                              logger.info(f"Cliente Simplificado: Recibido evento 'end' de {server_name}.")
-                             # End event might contain data or just signal completion
-                             # break # Don't break here, process potential data first
                         # Reset event only after processing data or on empty line
                         # current_event = None 
                     # else: ignore other lines for now
@@ -118,6 +119,47 @@ class MCPClient:
         finally:
              logger.info(f"Cliente Simplificado: Finalizada comunicación SSE con {server_name}.")
 
+    async def schedule_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Envía una solicitud para crear una nueva tarea programada al MCP de Programación."""
+        scheduler_url = SERVER_URLS.get("scheduler")
+        if not scheduler_url:
+            logger.error("URL para el MCP de Programación (scheduler) no configurada.")
+            raise ValueError("URL para el MCP de Programación no configurada.")
+        
+        if not SCHEDULER_MCP_API_TOKEN:
+            logger.error("Token API para el MCP de Programación no configurado.")
+            raise ValueError("Token API para el MCP de Programación no configurado.")
+
+        # El endpoint completo para crear tareas en el Scheduler MCP
+        # Asumiendo que la URL base ya incluye el /api/v1 o se construye aquí
+        # Basado en nuestro test_mcp_scheduler_onrender.py, la URL base es https://genia-mcp-scheduler.onrender.com
+        # y el endpoint es /api/v1/tasks
+        target_url = f"{scheduler_url}/api/v1/tasks"
+
+        headers = {
+            "Authorization": f"Bearer {SCHEDULER_MCP_API_TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        logger.info(f"MCPClient: Enviando POST a {target_url} para programar tarea con datos: {json.dumps(task_data)[:500]}...")
+
+        try:
+            response = await self._http_client.post(target_url, json=task_data, headers=headers)
+            response.raise_for_status()  # Lanza una excepción para errores HTTP (4xx o 5xx)
+            response_data = response.json()
+            logger.info(f"MCPClient: Tarea programada exitosamente. Respuesta del Scheduler: {response_data}")
+            return response_data
+        except httpx.HTTPStatusError as http_err:
+            logger.error(f"MCPClient: Error HTTP al programar tarea: {http_err.response.status_code} - {http_err.response.text}", exc_info=True)
+            # Re-lanzar con más contexto o devolver un diccionario de error estandarizado
+            raise ConnectionError(f"Error HTTP {http_err.response.status_code} al programar tarea: {http_err.response.text}") from http_err
+        except httpx.RequestError as req_err:
+            logger.error(f"MCPClient: Error de red al programar tarea: {req_err}", exc_info=True)
+            raise ConnectionError(f"Error de red al programar tarea: {req_err}") from req_err
+        except Exception as e:
+            logger.exception(f"MCPClient: Error inesperado al programar tarea: {e}")
+            raise
+
     async def close(self):
         """Cierra el cliente HTTPX."""
         if hasattr(self, '_http_client') and not self._http_client.is_closed:
@@ -130,26 +172,63 @@ class MCPClient:
 mcp_client_instance = MCPClient()
 
 # --- Ejemplo de uso (para pruebas internas si es necesario) ---
-async def _test_client():
-    print("Iniciando prueba del cliente MCP simplificado...")
-    test_message = SimpleMessage(
-        role="user",
-        content=SimpleTextContent(text="Explica qué es el Protocolo MCP en 3 frases."),
-        metadata={"model": "gpt-3.5-turbo"}
-    )
-    # Use the global instance for testing if run directly
+async def _test_scheduler_client():
+    print("Iniciando prueba del cliente MCP para Scheduler...")
+    
+    # Datos de ejemplo para una tarea de envío de correo
+    # Similar a lo que usamos en test_mcp_scheduler_onrender.py
+    import datetime
+    import uuid
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    scheduled_time_dt = now_utc + datetime.timedelta(minutes=5)
+    scheduled_at_utc_iso = scheduled_time_dt.isoformat()
+
+    email_content_details = {
+        "to_recipients": [
+            {"email": "test_from_backend@example.com", "name": "Test Backend Recipient"}
+        ],
+        "subject": "Scheduled Email via BackendMPC -> Scheduler -> EmailMCP",
+        "body_html": "<h1>Hello from BackendMPC!</h1><p>This email was scheduled via BackendMPC, processed by SchedulerMCP, and sent by EmailMCP.</p>",
+        "from_address": "noreply_backend@genia.systems"
+    }
+    mcp_email_request_body = {
+        "role": "user",
+        "content": email_content_details,
+        "metadata": {}
+    }
+    test_task_data = {
+        "genia_user_id": str(uuid.uuid4()), 
+        "platform_identifier": {
+            "platform_name": "email",
+            "account_id": "backend_user_for_email_task"
+        },
+        "scheduled_at_utc": scheduled_at_utc_iso,
+        "task_payload": {
+            "mcp_target_endpoint": "/mcp/send_email", # Endpoint en el EmailMCP
+            "mcp_request_body": mcp_email_request_body, # Payload para el EmailMCP
+            "user_platform_tokens": { 
+                "service_auth_key": "email_mcp_internal_key_placeholder"
+            }
+        },
+        "task_type": "email_send_via_scheduler_from_backend"
+    }
+
     try:
-        async for response in mcp_client_instance.request_mcp_server("openai", test_message):
-            print(f"---> Respuesta recibida en test: {response.content.text}")
+        print(f"Enviando datos de tarea: {json.dumps(test_task_data, indent=2)}")
+        response = await mcp_client_instance.schedule_task(test_task_data)
+        print(f"---> Respuesta del Scheduler MCP: {response}")
     except Exception as e:
-        print(f"Error en la prueba del cliente: {e}")
+        print(f"Error en la prueba del cliente Scheduler: {e}")
     finally:
-        await mcp_client_instance.close() # Close the global instance after test
+        await mcp_client_instance.close()
 
 # Only run the test if the script is executed directly
 if __name__ == "__main__":
     import asyncio
-    print("Ejecutando prueba interna del cliente MCP...")
-    # Note: This test will use the URLs defined above (env vars or localhost)
-    asyncio.run(_test_client())
-
+    # print("Ejecutando prueba interna del cliente MCP (OpenAI)...")
+    # asyncio.run(_test_client()) # Comentado para no ejecutar la prueba de OpenAI por defecto
+    
+    print("\nEjecutando prueba interna del cliente MCP para Scheduler...")
+    # Asegúrate de que SCHEDULER_MCP_BASE_URL y SCHEDULER_MCP_API_TOKEN estén en tu .env o variables de entorno
+    # si el Scheduler MCP no está en localhost o requiere un token diferente al de desarrollo.
+    asyncio.run(_test_scheduler_client())
