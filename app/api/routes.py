@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 # Import routers
-from app.api.endpoints import auth, genia_ceo, payments, tools, user # Import the new user router
+from app.api.endpoints import auth, genia_ceo, payments, tools, user, orchestration # Import the new orchestration router
 
 api_router = APIRouter()
 
@@ -18,5 +18,9 @@ api_router.include_router(tools.router, prefix="/tools", tags=["Tools"])
 
 # Include user routes (including tasks)
 api_router.include_router(user.router, prefix="/user", tags=["User"]) # Add the user router
+
+# Include orchestration routes
+api_router.include_router(orchestration.router, prefix="/orchestrate", tags=["Orchestration"]) # Add the orchestration router
+
 
 
