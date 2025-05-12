@@ -82,7 +82,7 @@ class TaskExecutor:
                 execution_successful = True
 
             else:
-                result_text = f"Comando 	'{main_command}	' no reconocido."
+                result_text = f"Comando '{main_command}' no reconocido."
                 execution_successful = True
 
             if mcp_server_name and request_content_text:
@@ -116,7 +116,7 @@ class TaskExecutor:
             result_text = f"Error inesperado al ejecutar {main_command}."
             execution_successful = False
 
-        logger.info(f"TaskExecutor: Enviando resultado para comando 	'{main_command}	' a {sender_number}: {result_text[:100]}...")
+        logger.info(f"TaskExecutor: Enviando resultado para comando '{main_command}' a {sender_number}: {result_text[:100]}...")
         formatted_sender = sender_number if sender_number.startswith("whatsapp:") else f"whatsapp:{sender_number}"
         try:
             await send_whatsapp_message(formatted_sender, result_text)
@@ -131,7 +131,7 @@ class TaskExecutor:
             email_subject = secondary_parameters.get("subject", f"Resultado de tu solicitud: {main_command}")
             
             if to_address and result_text:
-                logger.info(f"TaskExecutor: Acción secundaria 	'send_email	' detectada. Preparando para programar envío a {to_address}")
+                logger.info(f"TaskExecutor: Acción secundaria 'send_email' detectada. Preparando para programar envío a {to_address}")
                 
                 try:
                     now_utc = datetime.datetime.now(datetime.timezone.utc)
@@ -141,7 +141,9 @@ class TaskExecutor:
 
                     # El cuerpo del correo será el result_text (contenido generado por el comando principal)
                     # Convertir saltos de línea a <br> para HTML si es necesario, o enviar como texto plano.
-                    email_html_body = f"<h1>{email_subject}</h1><p>{result_text.replace(	'\\n	', 	'<br>	')}</p><p><br>---<br>Este correo fue generado y programado por GENIA a través de una solicitud de WhatsApp.</p>"
+                    # CORREGIDO: Realizar el reemplazo fuera del f-string
+                    formatted_email_body_content = result_text.replace('\n', '<br>')
+                    email_html_body = f"<h1>{email_subject}</h1><p>{formatted_email_body_content}</p><p><br>---<br>Este correo fue generado y programado por GENIA a través de una solicitud de WhatsApp.</p>"
 
                     email_content_details = {
                         "to_recipients": [
@@ -192,7 +194,7 @@ class TaskExecutor:
                     logger.exception(f"TaskExecutor: Excepción inesperada al intentar programar correo a {to_address}: {e_scheduler}")
                     await send_whatsapp_message(formatted_sender, f"Ocurrió un error inesperado al intentar programar el envío del resultado a {to_address}.")
             else:
-                logger.warning(f"TaskExecutor: No se pudo programar correo. Falta destinatario (	'{to_address}	') o cuerpo (	'{result_text}	').")
+                logger.warning(f"TaskExecutor: No se pudo programar correo. Falta destinatario ('{to_address}') o cuerpo ('{result_text}').")
                 if to_address:
                     await send_whatsapp_message(formatted_sender, f"No pude generar el contenido para programar el envío a {to_address}.")
         # --- END OF MODIFIED SECTION ---
