@@ -59,7 +59,9 @@ async def orchestrate_generate_and_schedule_email(request_data: GenerateAndSched
         scheduled_time_dt = now_utc + datetime.timedelta(minutes=2) # Programar para 2 mins en el futuro
         scheduled_at_utc_iso = scheduled_time_dt.isoformat()
 
-        email_html_body = f"<h1>{request_data.email_subject}</h1><p>{generated_content_text.replace('\\n', '<br>')}</p><p><br>---<br>Este correo fue generado y programado por GENIA.</p>"
+        # Corregir el f-string problemático
+        formatted_generated_content = generated_content_text.replace('\\n', '<br>')
+        email_html_body = f"<h1>{request_data.email_subject}</h1><p>{formatted_generated_content}</p><p><br>---<br>Este correo fue generado y programado por GENIA.</p>"
 
         email_content_details = {
             "to_recipients": [
