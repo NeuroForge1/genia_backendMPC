@@ -1,6 +1,7 @@
 # /home/ubuntu/genia_backendMPC/app/nlp/command_interpreter.py
 import json
 import logging
+import re
 from app.mcp_client.client import MCPClient, SimpleMessage, SimpleTextContent
 
 # Configure logging
@@ -15,16 +16,29 @@ class CommandInterpreter:
         """Interpreta el texto del usuario para identificar un comando y sus parámetros usando el MCP de OpenAI."""
         logger.info(f"CommandInterpreter: Interpretando texto: 	'{text[:50]}...'" )
 
-        # Prompt corregido: Se elimina 'transcribe_audio' de los comandos que el usuario puede solicitar directamente.
-        # La transcripción es un paso previo, el texto resultante es el que se interpreta aquí.
+        # Prompt mejorado: Ahora incluye detección de acciones secundarias como envío de correo
         prompt = f"""
-Dada la siguiente solicitud del usuario, identifica el comando principal y cualquier parámetro relevante. Responde SOLO con un objeto JSON con las claves 'command' (string) y 'parameters' (objeto con parámetros específicos del comando).
+Dada la siguiente solicitud del usuario, identifica el comando principal, sus parámetros, y cualquier acción secundaria solicitada. Responde SOLO con un objeto JSON con las siguientes claves:
+- 'command' (string): El comando principal solicitado
+- 'parameters' (objeto): Parámetros específicos del comando principal
+- 'secondary_action' (string, opcional): Una acción secundaria como enviar el resultado por correo
+- 'secondary_parameters' (objeto, opcional): Parámetros para la acción secundaria
 
-Comandos posibles que el usuario puede solicitar y sus parámetros:
+Comandos principales posibles:
 - generate_text: {{"topic": "string"}}
 - search_keywords: {{"topic": "string"}}
 - send_whatsapp: {{"recipient_number": "string", "message_text": "string"}}
 - unknown: (si no se reconoce ningún comando de los anteriores)
+
+Acciones secundarias posibles:
+- send_email: {{"to_address": "string", "subject": "string (opcional)"}}
+
+Ejemplos:
+1. "Crea un poema sobre la amistad y envíalo a usuario@ejemplo.com" →
+   {{"command": "generate_text", "parameters": {{"topic": "poema sobre la amistad"}}, "secondary_action": "send_email", "secondary_parameters": {{"to_address": "usuario@ejemplo.com"}}}}
+
+2. "Busca palabras clave para marketing digital" →
+   {{"command": "search_keywords", "parameters": {{"topic": "marketing digital"}}}}
 
 Solicitud del usuario: "{text}"
 
@@ -34,7 +48,7 @@ JSON de respuesta:
         request_message = SimpleMessage(
             role="user",
             content=SimpleTextContent(text=prompt),
-            metadata={"model": "gpt-3.5-turbo"} # Specify model if needed by MCP
+            metadata={"model": "gpt-4o"} # Usar GPT-4o para mejor interpretación de comandos compuestos
         )
 
         interpreted_command = {"command": "unknown", "parameters": {}}
@@ -49,6 +63,12 @@ JSON de respuesta:
                              interpreted_command["command"] = command_data["command"]
                         if "parameters" in command_data and isinstance(command_data["parameters"], dict):
                              interpreted_command["parameters"] = command_data["parameters"]
+                        # Añadir soporte para acciones secundarias
+                        if "secondary_action" in command_data and isinstance(command_data["secondary_action"], str):
+                             interpreted_command["secondary_action"] = command_data["secondary_action"]
+                        if "secondary_parameters" in command_data and isinstance(command_data["secondary_parameters"], dict):
+                             interpreted_command["secondary_parameters"] = command_data["secondary_parameters"]
+                        
                         logger.info(f"CommandInterpreter: Comando interpretado: {interpreted_command}")
                         break # Got the interpretation
                     except json.JSONDecodeError as json_err:
@@ -71,6 +91,14 @@ JSON de respuesta:
             logger.exception(f"CommandInterpreter: Error inesperado durante la interpretación: {e}")
             interpreted_command["error"] = f"Unexpected error during interpretation: {e}"
 
+        # Fallback: Intentar extraer dirección de correo si OpenAI no la detectó
+        if "secondary_action" not in interpreted_command:
+            email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
+            if email_match:
+                email = email_match.group(0)
+                logger.info(f"CommandInterpreter: Detectada dirección de correo mediante regex: {email}")
+                interpreted_command["secondary_action"] = "send_email"
+                interpreted_command["secondary_parameters"] = {"to_address": email}
+
         # Return the dictionary (including potential error key)
         return interpreted_command
-
