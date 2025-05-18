@@ -56,8 +56,12 @@ JSON de respuesta:
             async for response in self.mcp_client.request_mcp_server("openai", request_message):
                 if response.role == "assistant" and response.content.text:
                     try:
-                        # Parse the JSON response from OpenAI
-                        command_data = json.loads(response.content.text.strip())
+                        # Limpiar la respuesta de backticks y otros formatos antes de parsear
+                        cleaned_response = self._clean_json_response(response.content.text)
+                        logger.info(f"CommandInterpreter: Respuesta limpia para parseo: {cleaned_response}")
+                        
+                        # Parse the cleaned JSON response from OpenAI
+                        command_data = json.loads(cleaned_response)
                         # Basic validation
                         if "command" in command_data and isinstance(command_data["command"], str):
                              interpreted_command["command"] = command_data["command"]
@@ -73,6 +77,7 @@ JSON de respuesta:
                         break # Got the interpretation
                     except json.JSONDecodeError as json_err:
                         logger.error(f"CommandInterpreter: Error al parsear JSON de OpenAI: {json_err} - Respuesta: {response.content.text}")
+                        logger.error(f"CommandInterpreter: Respuesta limpia que falló: {self._clean_json_response(response.content.text)}")
                         interpreted_command["error"] = f"Invalid JSON response from interpreter: {response.content.text}"
                         break
                 elif response.role == "error":
@@ -102,3 +107,17 @@ JSON de respuesta:
 
         # Return the dictionary (including potential error key)
         return interpreted_command
+        
+    def _clean_json_response(self, response_text: str) -> str:
+        """Limpia la respuesta de OpenAI para extraer solo el JSON válido."""
+        # Eliminar backticks y marcadores de código
+        cleaned = re.sub(r'```(?:json)?|```', '', response_text)
+        
+        # Eliminar espacios en blanco al inicio y final
+        cleaned = cleaned.strip()
+        
+        # Registrar la limpieza para depuración
+        if cleaned != response_text:
+            logger.info(f"CommandInterpreter: Respuesta limpiada de formato markdown")
+            
+        return cleaned
