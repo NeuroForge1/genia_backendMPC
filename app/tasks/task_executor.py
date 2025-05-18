@@ -1,4 +1,4 @@
-# /home/ubuntu/genia_backendMPC/app/tasks/task_executor_direct.py
+# /home/ubuntu/genia_backendMPC/app/tasks/task_executor.py
 
 from typing import Dict, Any
 import logging
@@ -33,18 +33,33 @@ class TaskExecutor:
         self.email_tool = GmailTool()
         logger.info("TaskExecutor inicializado con cliente MCP y EmailTool.")
 
-    async def execute_task_and_respond(self, interpreted_data: Dict[str, Any], sender_number: str):
+    async def execute_task_and_respond(self, command: str, parameters: Dict[str, Any], sender_number: str):
         """Ejecuta la tarea principal, maneja una posible acción secundaria de envío de correo (ahora directo),
            y envía el resultado principal por WhatsApp."""
 
-        main_command = interpreted_data.get("main_command", "unknown")
-        main_parameters = interpreted_data.get("main_parameters", {})
-        secondary_action = interpreted_data.get("secondary_action")
-        secondary_parameters = interpreted_data.get("secondary_parameters", {})
+        logger.info(f"TaskExecutor: Ejecutando command: {command} para {sender_number} con parameters: {parameters}")
+        
+        # Construir un objeto interpreted_data compatible con la lógica existente
+        interpreted_data = {
+            "main_command": command,
+            "main_parameters": parameters,
+            "secondary_action": None,
+            "secondary_parameters": {}
+        }
+        
+        # Detectar si hay una acción secundaria de envío de correo
+        if "to_address" in parameters:
+            interpreted_data["secondary_action"] = "send_email"
+            interpreted_data["secondary_parameters"] = {
+                "to_address": parameters["to_address"],
+                "subject": parameters.get("subject", f"Resultado de tu solicitud: {command}")
+            }
+            logger.info(f"TaskExecutor: Acción secundaria detectada: send_email con parámetros: {interpreted_data['secondary_parameters']}")
 
-        logger.info(f"TaskExecutor: Ejecutando main_command: {main_command} para {sender_number} con main_parameters: {main_parameters}")
-        if secondary_action:
-            logger.info(f"TaskExecutor: Acción secundaria detectada: {secondary_action} con parámetros: {secondary_parameters}")
+        main_command = interpreted_data["main_command"]
+        main_parameters = interpreted_data["main_parameters"]
+        secondary_action = interpreted_data["secondary_action"]
+        secondary_parameters = interpreted_data["secondary_parameters"]
 
         result_text = "Lo siento, no pude ejecutar esa acción."
         mcp_server_name = None
