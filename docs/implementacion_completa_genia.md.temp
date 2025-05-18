@@ -1,0 +1,20 @@
+import json
+from typing import Dict, Any, List, Optional
+import openai
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("openai_service")
+
+# Clave API de OpenAI
+OPENAI_API_KEY = "PLACEHOLDER_OPENAI_API_KEY"
+
+# Inicializar cliente de OpenAI
+openai.api_key = OPENAI_API_KEY
+
+async def analyze_user_request(request_text: str) -> Dict[str, Any]:
+    """
+    Analiza una solicitud de usuario en lenguaje natural para determinar
+    qué herramientas se necesitan y qué operaciones realizar.
+    
+    Args:

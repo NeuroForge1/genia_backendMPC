@@ -1,0 +1,49 @@
+```
+# Supabase
+SUPABASE_URL=PLACEHOLDER_SUPABASE_URL
+SUPABASE_ANON_KEY=PLACEHOLDER_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY
+
+# OpenAI
+OPENAI_API_KEY=PLACEHOLDER_OPENAI_API_KEY
+
+# MCP Servers
+GITHUB_MCP_URL=https://genia-mcp-server-github.onrender.com
+NOTION_MCP_URL=https://genia-mcp-server-notion.onrender.com
+SLACK_MCP_URL=https://genia-mcp-server-slack.onrender.com
+GOOGLE_WORKSPACE_MCP_URL=https://genia-mcp-server-google-workspace.onrender.com
+INSTAGRAM_MCP_URL=https://genia-mcp-server-instagram.onrender.com
+TRELLO_MCP_URL=https://genia-mcp-server-trello.onrender.com
+TWITTER_X_MCP_URL=https://genia-mcp-server-twitter-x.onrender.com
+GOOGLE_CALENDAR_MCP_URL=https://genia-mcp-server-google-calendar.onrender.com
+```
+
+### Archivo `render.yaml`
+
+Para facilitar el despliegue en Render, se ha creado un archivo `render.yaml`:
+
+```yaml
+services:
+  # Backend principal de GENIA
+  - type: web
+    name: genia-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        value: PLACEHOLDER_SUPABASE_URL
+      - key: SUPABASE_ANON_KEY
+        value: PLACEHOLDER_SUPABASE_ANON_KEY
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY
+      - key: OPENAI_API_KEY
+        value: PLACEHOLDER_OPENAI_API_KEY
+      - key: GITHUB_MCP_URL
+        value: https://genia-mcp-server-github.onrender.com
+      - key: NOTION_MCP_URL
+        value: https://genia-mcp-server-notion.onrender.com
+      - key: SLACK_MCP_URL
+        value: https://genia-mcp-server-slack.onrender.com
+      - key: GOOGLE_WORKSPACE_MCP_URL
+        value: https://genia-mcp-server-google-workspace.onrender.com
