@@ -46,6 +46,18 @@ async def process_command_background(sender_number: str, message_content: str, i
         interpreted_data = await command_interpreter.interpret_command(message_content)
         command = interpreted_data.get("command", "unknown")
         parameters = interpreted_data.get("parameters", {})
+        
+        # Extraer secondary_action y secondary_parameters si existen
+        secondary_action = interpreted_data.get("secondary_action")
+        secondary_parameters = interpreted_data.get("secondary_parameters", {})
+        
+        # Si hay una acción secundaria de envío de correo, añadir to_address a parameters
+        # para mantener compatibilidad con la versión anterior de TaskExecutor
+        if secondary_action == "send_email" and "to_address" in secondary_parameters:
+            parameters["to_address"] = secondary_parameters["to_address"]
+            if "subject" in secondary_parameters:
+                parameters["subject"] = secondary_parameters["subject"]
+            logger.info(f"Detected email action, added to_address '{secondary_parameters['to_address']}' to parameters")
 
         if command != "unknown":
             logger.info(f"Interpreted command: {command}, parameters: {parameters}")
@@ -190,4 +202,3 @@ async def receive_whatsapp_message(request: Request, background_tasks: Backgroun
 @router.get("/health") # Changed path to be relative to prefix
 async def health_check():
     return {"status": "ok"}
-
