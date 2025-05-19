@@ -26,40 +26,38 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# --- TEMPORARILY COMMENTED OUT FOR DEBUGGING 405 ERROR ---
-# # --- Configuración CORS Corregida (Usando Variable parseada del módulo config) ---
-# # Usar la variable CORS_ORIGINS importada directamente desde config
-# if CORS_ORIGINS:
-#     print(f"[DEBUG] Configurando CORS con orígenes parseados: {CORS_ORIGINS}") # Log para verificar
-#     app.add_middleware(
-#         CORSMiddleware, # Middleware de FastAPI
-#         allow_origins=CORS_ORIGINS, # Usar la lista ya parseada
-#         allow_credentials=True,
-#         allow_methods=["*"],
-#         allow_headers=["*"],
-#     )
-# else:
-#     print("[WARN] CORS_ORIGINS no está configurado o parseado correctamente. CORS no habilitado.")
-# # --- Fin Configuración CORS Corregida ---
+# --- Configuración CORS Corregida (Usando Variable parseada del módulo config) ---
+# Usar la variable CORS_ORIGINS importada directamente desde config
+if CORS_ORIGINS:
+    print(f"[DEBUG] Configurando CORS con orígenes parseados: {CORS_ORIGINS}") # Log para verificar
+    app.add_middleware(
+        CORSMiddleware, # Middleware de FastAPI
+        allow_origins=CORS_ORIGINS, # Usar la lista ya parseada
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    print("[WARN] CORS_ORIGINS no está configurado o parseado correctamente. CORS no habilitado.")
+# --- Fin Configuración CORS Corregida ---
 
-# # --- TEMPORARILY COMMENTED OUT FOR DEBUGGING 405 ERROR ---
-# # --- RE-AÑADIDO Manejador Explícito OPTIONS ---
-# @app.options("/{rest_of_path:path}")
-# async def preflight_handler(rest_of_path: str):
-#     print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
-#     # Devolver cabeceras CORS necesarias para la solicitud preflight
-#     # Asegurarse de que CORS_ORIGINS se use correctamente aquí también
-#     origin_header = ",".join(CORS_ORIGINS) if CORS_ORIGINS else "*"
-#     return JSONResponse(
-#         content={"message": "Preflight check successful"},
-#         headers={
-#             "Access-Control-Allow-Origin": origin_header, # Usar la variable global parseada
-#             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-#             "Access-Control-Allow-Headers": "*", # Permitir todas las cabeceras solicitadas
-#             "Access-Control-Allow-Credentials": "true",
-#         }
-#     )
-# # --- Fin RE-AÑADIDO Manejador Explícito OPTIONS ---
+# --- Manejador Explícito OPTIONS ---
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    print(f"[DEBUG] Manejando solicitud OPTIONS explícita para: /{rest_of_path}")
+    # Devolver cabeceras CORS necesarias para la solicitud preflight
+    # Asegurarse de que CORS_ORIGINS se use correctamente aquí también
+    origin_header = ",".join(CORS_ORIGINS) if CORS_ORIGINS else "*"
+    return JSONResponse(
+        content={"message": "Preflight check successful"},
+        headers={
+            "Access-Control-Allow-Origin": origin_header, # Usar la variable global parseada
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*", # Permitir todas las cabeceras solicitadas
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+# --- Fin Manejador Explícito OPTIONS ---
 
 # Incluir rutas de la API (después de CORS y OPTIONS handler)
 app.include_router(api_router, prefix=settings.API_V1_STR)
