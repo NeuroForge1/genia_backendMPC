@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 # Import routers
-from app.api.endpoints import auth, genia_ceo, payments, tools, user # Import the new user router
+from app.api.endpoints import auth_enhanced as auth, genia_ceo, payments, tools, user # Cambiado a auth_enhanced
 
 api_router = APIRouter()
 
@@ -18,5 +18,4 @@ api_router.include_router(tools.router, prefix="/tools", tags=["Tools"])
 
 # Include user routes (including tasks)
 api_router.include_router(user.router, prefix="/user", tags=["User"]) # Add the user router
-
 
